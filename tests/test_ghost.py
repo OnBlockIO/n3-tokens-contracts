@@ -13,18 +13,18 @@ from boa3_test.tests.test_classes.TestExecutionException import TestExecutionExc
 
 class GhostTest(BoaTest):
 
-    CONTRACT_PATH = '/home/merl/source/n3_gm/ghost-n3/ghost.nef'
+    CONTRACT_PATH = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/ghost.nef'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
 
     def build_contract(self):
-        output, manifest = self.compile_and_save("/home/merl/source/n3_gm/ghost-n3/ghost.py")
+        output, manifest = self.compile_and_save("/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/ghost.py")
         print('address: ' + str(UInt160(hash160(output))))
 
     def prepare_testengine(self) -> TestEngine:
         self.build_contract()
-        root_folder = '/home/merl/source/n3_gm/neo3-boa/boa3'
+        root_folder = '/Users/vincent/Dev/neo3-boa/boa3'
         engine = TestEngine(root_folder)
         engine.reset_engine()
         return engine
@@ -72,7 +72,7 @@ class GhostTest(BoaTest):
 
         print(2)
         # should return false if the signature isn't from the owner
-        esult = self.run_smart_contract(engine, self.CONTRACT_PATH, 'deploy',
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH, 'deploy',
                                         signer_accounts=[self.OTHER_ACCOUNT_1],
                                         expected_result_type=bool)
         self.assertEqual(False, result)
@@ -257,6 +257,72 @@ class GhostTest(BoaTest):
         ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH, 'totalSupply')
         print("supply nft: " + str(ghost_supply_after))
         self.assertEqual(1, ghost_supply_after)
+
+    def test_ghost_mint_transfer(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH.replace('.py', '.nef'))
+
+        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
+
+        output, manifest = self.compile_and_save(self.CONTRACT_PATH.replace('.nef', '.py'))
+        ghost_address = hash160(output)
+        print(to_hex_str(ghost_address))
+
+        output, manifest = self.compile_and_save(aux_path)
+        aux_address = hash160(output)
+        print(to_hex_str(aux_address))
+
+        add_amount = 10 * 10 ** 8
+        # deploying ghost smart contract
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH, 'deploy',
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+        # when deploying, the contract will mint tokens to the owner
+        deploy_event = engine.get_events('Deploy')
+        self.assertEqual(1, len(deploy_event))
+        self.assertEqual(2, len(deploy_event[0].arguments))
+
+        engine.add_gas(aux_address, add_amount)
+        tokenMeta = {
+           "name": "GHOST",
+           "description": "A ghost shows up",
+           "image": "{some image URI}",
+           "tokenURI": "{some URI}"
+            }
+
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH, 'mint', 
+                aux_address, tokenMeta, "lockedContent", None,
+                signer_accounts=[aux_address],
+                expected_result_type=bytes)
+
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH, 'properties', token)
+        self.print_notif(engine.notifications)
+        print("props: " + str(properties))
+
+        ghost_amount_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
+        gas_aux_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', aux_address)
+        print("ghost gas amount: " + str(ghost_amount_after))
+        print("aux gas amount: " + str(gas_aux_after))
+        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH, 'balanceOf', aux_address)
+        print("balance nft: " + str(ghost_balance_after))
+        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH, 'totalSupply')
+        print("supply nft: " + str(ghost_supply_after))
+        self.assertEqual(1, ghost_supply_after)
+
+        #print("test: " + str(self.OTHER_ACCOUNT_1))
+        #print("test: " + str(token))
+
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH, 'transfer', 
+                self.OTHER_ACCOUNT_1, token, None,
+                signer_accounts=[aux_address],
+                expected_result_type=bool)
+        self.assertEqual(True, result)
+        ghost_balance_after_transfer = self.run_smart_contract(engine, self.CONTRACT_PATH, 'balanceOf', aux_address)
+
+        print("balance nft after transfer: " + str(ghost_balance_after_transfer))
+        self.assertEqual(0, ghost_balance_after_transfer)
+
 
     def test_ghost_burn(self):
         engine = self.prepare_testengine()
