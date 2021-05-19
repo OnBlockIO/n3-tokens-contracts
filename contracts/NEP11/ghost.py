@@ -275,7 +275,7 @@ def transfer(to_address: UInt160, token: bytes, data: Any) -> bool:
     if (not check_witness(token_owner)):
         return False;
 
-    if (token_owner != to):
+    if (token_owner != to_address):
         add_to_balance(ctx, token_owner, -1)
         remove_token(ctx, token_owner, token)
 
