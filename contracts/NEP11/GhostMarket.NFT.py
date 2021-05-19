@@ -27,7 +27,7 @@ def manifest_metadata() -> NeoMetadata:
     """
     meta = NeoMetadata()
     meta.author = "Mathias Enzensberger"
-    meta.description = "Ghost NEP-11"
+    meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
     return meta
 
@@ -381,7 +381,7 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
 
     ctx = get_context()
     fee = get_mint_fee(ctx)
-    if fee <= 0:
+    if fee < 0:
         raise Exception("Mint fee can't be <= 0")
 
     if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):

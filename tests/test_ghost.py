@@ -19,7 +19,7 @@ class GhostTest(BoaTest):
     OTHER_ACCOUNT_2 = bytes(range(20))
 
     def build_contract(self):
-        output, manifest = self.compile_and_save("/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/ghost.py")
+        output, manifest = self.compile_and_save("/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/GhostMarket.NFT.py")
         print('address: ' + str(UInt160(hash160(output))))
 
     def prepare_testengine(self) -> TestEngine:
@@ -309,9 +309,6 @@ class GhostTest(BoaTest):
         ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH, 'totalSupply')
         print("supply nft: " + str(ghost_supply_after))
         self.assertEqual(1, ghost_supply_after)
-
-        #print("test: " + str(self.OTHER_ACCOUNT_1))
-        #print("test: " + str(token))
 
         result = self.run_smart_contract(engine, self.CONTRACT_PATH, 'transfer', 
                 self.OTHER_ACCOUNT_1, token, None,
