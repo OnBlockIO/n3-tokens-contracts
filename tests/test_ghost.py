@@ -13,6 +13,7 @@ from boa3_test.tests.test_classes.TestExecutionException import TestExecutionExc
 
 class GhostTest(BoaTest):
 
+    CONTRACT_PATH_JSON = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/GhostMarket.NFT.manifest.json'
     CONTRACT_PATH_NEF = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/GhostMarket.NFT.py'
     BOA_PATH = '/Users/vincent/Dev/neo3-boa/boa3'
@@ -100,6 +101,25 @@ class GhostTest(BoaTest):
         self.assertEqual(False, result)
         self.print_notif(engine.notifications)
 
+    def test_ghost_upgrade(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+
+        # deploying ghost smart contract
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'deploy',
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
+        # upgrading ghost smart contract
+        script = bytes(self.CONTRACT_PATH_PY, encoding='utf8')
+        manifest = bytes(self.CONTRACT_PATH_JSON, encoding='utf8')
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'update', 
+                                         script, manifest,
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
     def test_ghost_destroy(self):
         engine = self.prepare_testengine()
 
@@ -115,10 +135,38 @@ class GhostTest(BoaTest):
                                          expected_result_type=bool)
 
         # should not exist anymore
-        result = engine.run(self.CONTRACT_PATH_NEF, 'symbol', reset_engine=True)
-        assert result == 0
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'symbol')
+        self.assertNotEqual('GHOST', result)
 
         self.print_notif(engine.notifications)
+
+    def test_ghost_verify(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+
+        # deploying ghost smart contract
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'deploy',
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
+        # should fail because account does not have enough for fees
+        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
+            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify', self.OTHER_ACCOUNT_1)
+
+        self.print_notif(engine.notifications)
+
+    def test_ghost_authorize(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+
+        # deploying ghost smart contract
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'deploy',
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
+        # TODO #
 
     def test_ghost_mint(self):
         engine = self.prepare_testengine()
@@ -412,6 +460,40 @@ class GhostTest(BoaTest):
         self.assertEqual(0, ghost_supply_after)
         self.print_notif(engine.notifications)
 
+    def test_ghost_onNEP11Payment(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
+        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
+        ghost_address = hash160(output)
+        print(to_hex_str(ghost_address))
+        output, manifest = self.compile_and_save(aux_path)
+        aux_address = hash160(output)
+        print(to_hex_str(aux_address))
+
+        # deploying ghost smart contract
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'deploy',
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
+        # add some gas for fees
+        add_amount = 10 * 10 ** 8
+        engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
+
+        # mint
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
+            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, None,
+            signer_accounts=[self.OTHER_ACCOUNT_1],
+            expected_result_type=bytes)
+
+        # the smart contract will abort if any address calls the NEP11 onPayment method
+        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
+            result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP11Payment', 
+                self.OTHER_ACCOUNT_1, 1, token, None,
+                signer_accounts=[self.OTHER_ACCOUNT_1],
+                expected_result_type=bool)
+
     def test_ghost_onNEP17Payment(self):
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
@@ -438,7 +520,7 @@ class GhostTest(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
-        # the smart contract will abort if some address other than GAS calls the onPayment method
+        # the smart contract will abort if some address other than GAS calls the NEP17 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
             self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP17Payment', aux_address, add_amount, None,
                                     signer_accounts=[aux_address])
