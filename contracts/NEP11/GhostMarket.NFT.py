@@ -26,7 +26,7 @@ def manifest_metadata() -> NeoMetadata:
     Defines this smart contract's metadata information
     """
     meta = NeoMetadata()
-    meta.author = "Mathias Enzensberger"
+    meta.author = "Mathias Enzensberger, Vincent Geneste"
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
     meta.supportedstandards = "NEP-11"
@@ -80,6 +80,9 @@ AUTH_ADDRESSES = b'AUTH_ADDR'
 # -------------------------------------------
 
 on_transfer = CreateNewEvent(
+    #MUST trigger when tokens are transferred, including zero value transfers.
+    #A token contract which creates new tokens MUST trigger a Transfer event with the from address set to null when tokens are created.
+    #A token contract which burns tokens MUST trigger a Transfer event with the to address set to null when tokens are burned.
     [
         ('from_addr', Union[UInt160, None]),
         ('to_addr', Union[UInt160, None]),
@@ -90,6 +93,7 @@ on_transfer = CreateNewEvent(
 )
 
 on_auth = CreateNewEvent(
+    #trigger when an address has been authorized.
     [
         ('authorized', UInt160),
         ('add', bool),
@@ -98,6 +102,7 @@ on_auth = CreateNewEvent(
 )
 
 on_mint = CreateNewEvent(
+    #trigger when a token has been minted.
     [
         ('creator', UInt160),
         ('tokenId', bytes),
@@ -109,14 +114,16 @@ on_mint = CreateNewEvent(
 )
 
 on_mint_fees_withdrawn = CreateNewEvent(
+    #trigger when mint fees are withdrawn.
     [
         ('from_addr', int),
         ('value', int)
     ],
-    'MintFeesUWithdrawn'
+    'MintFeesWithdrawn'
 )
 
 on_mint_fees_updated = CreateNewEvent(
+    #trigger when mint fees are updated.
     [
         ('value', int)
     ],
@@ -124,6 +131,7 @@ on_mint_fees_updated = CreateNewEvent(
 )
 
 on_royalties_set = CreateNewEvent(
+    #trigger when royalties are configured.
     [
         ('tokenId', bytes),
         ('recipients', List[UInt160]),
@@ -133,6 +141,7 @@ on_royalties_set = CreateNewEvent(
 )
 
 on_deploy = CreateNewEvent(
+    #trigger on contract deploy.
     [
         ('owner', UInt160),
         ('symbol', str),
@@ -201,11 +210,12 @@ def balanceOf(owner: UInt160) -> int:
     """
     Get the current balance of an address
 
-    The parameter account must be a 20-byte address represented by a UInt160.
+    The parameter owner must be a 20-byte address represented by a UInt160.
 
-    :param owner: the account address to retrieve the balance for
+    :param owner: the owner address to retrieve the balance for
     :type owner: UInt160
-    :return: the total amount of NFTs owned by the specified address.
+    :return: the total amount of tokens owned by the specified address.
+    :raise AssertionError: raised if `owner` length is not 20.
     """
     assert len(owner) == 20
     return get(mk_balance_key(owner)).to_int()
@@ -215,40 +225,42 @@ def tokensOf(owner: UInt160) -> Iterator:
     """
     Get all of the token ids owned by the specified address
 
-    The parameter account must be a 20-byte address represented by a UInt160.
+    The parameter owner must be a 20-byte address represented by a UInt160.
 
-    :param owner: the account address to retrieve the tokens for
+    :param owner: the owner address to retrieve the tokens for
     :type owner: UInt160
     :return: an iterator that contains all of the token ids owned by the specified address.
+    :raise AssertionError: raised if `owner` length is not 20.
     """
     assert len(owner) == 20
     ctx = get_context()
-
     return find(mk_account_prefix(owner), ctx)
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     """
-    Transfers an amount of NEP17 tokens from one account to another
+    Transfers the token with id tokenId to address to
 
-    If the method succeeds, it must fire the `Transfer` event and must return true, even if the amount is 0,
-    or from and to are the same address.
+    The parameter to SHOULD be a 20-byte address. If not, this method SHOULD throw an exception.
+    The parameter tokenId SHOULD be a valid NFT. If not, this method SHOULD throw an exception.
+    The function SHOULD return false if the token that will be transferred has more than one owner.
+    If the method succeeds, it MUST fire the Transfer event, and MUST return true, even if the token is sent to the owner.
+    If the receiver is a deployed contract, the function MUST call onNEP11Payment method on receiver contract with the data parameter from transfer AFTER firing the Transfer event.
+    The function SHOULD check whether the owner address equals the caller contract hash. If so, the transfer SHOULD be processed; If not, the function SHOULD use the SYSCALL Neo.Runtime.CheckWitness to verify the transfer.
+    If the transfer is not processed, the function SHOULD return false.
 
-    :param from_address: the address to transfer from
-    :type from_address: UInt160
-    :param to_address: the address to transfer to
-    :type to_address: UInt160
-    :param amount: the amount of NEP17 tokens to transfer
-    :type amount: int
+    :param to: the address to transfer to
+    :type to: UInt160
+    :param tokenId: the token to transfer
+    :type tokenId: UInt160
     :param data: whatever data is pertinent to the onPayment method
     :type data: Any
 
     :return: whether the transfer was successful
-    :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
+    :raise AssertionError: raised if `to` length is not 20 or if `tokenId` is not a valid NFT.
+    :emits Transfer: on success emits Transfer
     """
-    # the parameters from and to should be 20-byte addresses. If not, this method should throw an exception.
     assert len(to) == 20
-
     ctx = get_context()
     token_owner = get_owner_of(ctx, tokenId)
 
@@ -261,7 +273,7 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
 
         add_to_balance(ctx, to, 1)
         add_token(ctx, to, tokenId)
-        set_owner_of(ctx, tokenId, to)
+        add_owner_of(ctx, tokenId, to)
     post_transfer(token_owner, to, tokenId, data)
     return True
 
@@ -275,7 +287,11 @@ def ownerOf(tokenId: bytes) -> UInt160:
     :param tokenId: the token for which to check the ownership
     :type tokenId: ByteString
     :return: the owner of the specified token.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
+    ctx = get_context()
+    owner = get_owner_of(ctx, tokenId)
+    return get_locked_content(ctx, owner)
 
 @public
 def tokens() -> Iterator:
@@ -290,8 +306,15 @@ def tokens() -> Iterator:
 @public
 def properties(tokenId: bytes) -> Dict[str, str]:
     """
-    TODO
+    Get the properties of a token.
 
+    Returns a serialized NVM object containing the properties for the given NFT. The NVM object must conform to the "NEO NFT Metadata JSON Schema".
+    The parameter tokenId SHOULD be a valid NFT. If not, this method SHOULD throw an exception.
+
+    :param tokenId: the token for which to check the properties
+    :type tokenId: ByteString
+    :return: a serialized NVM object containing the properties for the given NFT.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
     ctx = get_context()
     meta = get_meta(ctx, tokenId)
@@ -299,28 +322,26 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     return cast(dict[str, str], deserialized)
 
 @public
-def burn(token: bytes) -> bool:
+def burn(tokenId: bytes) -> bool:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Burn a token.
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
-    :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param tokenId: the token to burn
+    :type tokenId: ByteString
+    :return: whether the burn was successful.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
-    return internal_burn(token)
+    return internal_burn(tokenId)
 
 @public
 def multiBurn(tokens: List[bytes]) -> List[bool]:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Burn multiple tokens.
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
-    :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param tokens: list of tokens to burn
+    :type tokens: ByteString list
+    :return: whether each burn was successful, as a list.
+    :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     burned: List[bool] = []
     for i in tokens:
@@ -330,15 +351,18 @@ def multiBurn(tokens: List[bytes]) -> List[bool]:
 @public
 def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Mint new token.
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
+    :param account: the address of the account that is minting token
     :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     """
-
     ctx = get_context()
     fee = get_mint_fee(ctx)
     if fee < 0:
@@ -352,13 +376,17 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
 @public
 def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], data: Any) -> List[bytes]:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Mint new tokens.
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
+    :param account: the address of the account that is minting tokens
     :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     """
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
@@ -368,33 +396,35 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], dat
 @public
 def withdrawFee(account: UInt160) -> bool:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Withdraw mint fees.
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
+    :param account: the address of the account that is withdrawing fees
     :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :return: whether the transaction was successful.
+    :raise AssertionError: raised if witness is not owner
+    :emits MintFeesWithdrawn: on success emits MintFeesWithdrawn
     """
-
     assert verify()
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash]))
+    on_mint_fees_withdrawn(account, current_balance)
     return cast(bool, call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None]))
 
 @public
 def getFeeBalance() -> Any:
     """
-    TODO
+    Get mint fees balance.
 
+    :return: balance of mint fees.
     """
-
     balance = call_contract(GAS, 'balanceOf', [executing_script_hash])
     return balance
 
 @public
 def getMintFee() -> int:
     """
-    TODO
+    Get configured mint fees value.
+
+    :return: configured value of mint fees.
     """
     ctx = get_context()
     fee = get_mint_fee(ctx)
@@ -403,42 +433,63 @@ def getMintFee() -> int:
 @public
 def setMintFee(fee: int) -> int:
     """
-    TODO
+    Set mint fees value.
+
+    :param fee: fee to be used when minting
+    :type fee: int
+    :return: configured value of mint fees.
+    :raise AssertionError: raised if witness is not owner
+    :emits MintFeesUpdated: on success emits MintFeesUpdated
     """
     assert verify()
     ctx = get_context()
+    on_mint_fees_updated(fee)
     return set_mint_fee(ctx, fee)
 
 @public
-def getLockedContentViewCount(token: bytes) -> int:
+def getLockedContentViewCount(tokenId: bytes) -> int:
     """
-    TODO
+    Get lock content view count of a token.
+
+    :param tokenId: the token to query
+    :type tokenId: ByteString
+    :return: number of times the lock content of this token was accessed.
     """
     ctx = get_context()
-    return get_locked_view_counter(ctx, token)
+    return get_locked_view_counter(ctx, tokenId)
 
 @public
-def getLockedContent(token: bytes) -> bytes:
+def getLockedContent(tokenId: bytes) -> bytes:
     """
-    TODO
+    Get lock content of a token.
+
+    :param tokenId: the token to query
+    :type tokenId: ByteString
+    :return: the lock content of this token.
+    :raise AssertionError: raised if witness is not owner
     """
     ctx = get_context()
-    owner = get_owner_of(ctx, token)
+    owner = get_owner_of(ctx, tokenId)
 
     if not check_witness(owner):
         raise Exception("Prohibited access to locked content!")
-
-    incr_locked_view_counter(ctx, token)
+    incr_locked_view_counter(ctx, tokenId)
     
-    return get_locked_content(ctx, token)
+    return get_locked_content(ctx, tokenId)
 
 @public
 def set_authorized_address(address: UInt160, authorized: bool) -> bool:
     """
+    Configure address authorizations.
+
     When this contract address is included in the transaction signature,
     this method will be triggered as a VerificationTrigger to verify that the signature is correct.
     For example, this method needs to be called when withdrawing token from the contract.
 
+    :param address: the address of the account that is being authorized
+    :type address: UInt160
+    :param authorized: authorization status of this address
+    :type authorized: bool
     :return: whether the transaction signature is correct
     """
     if not verify():
@@ -468,6 +519,8 @@ def set_authorized_address(address: UInt160, authorized: bool) -> bool:
 @public
 def verify() -> bool:
     """
+    Check if the address is allowed.
+
     When this contract address is included in the transaction signature,
     this method will be triggered as a VerificationTrigger to verify that the signature is correct.
     For example, this method needs to be called when withdrawing token from the contract.
@@ -486,9 +539,9 @@ def verify() -> bool:
 @public
 def deploy() -> bool:
     """
-    Deploys the contract.
+    Deploy the contract.
 
-    :return: whether the deploy was successful. This method must return True only during the smart contract's deploy.
+    :return: whether the deploy was successful. This method must return True only during the smart contract deploy.
     """
     if not check_witness(OWNER):
         return False
@@ -511,12 +564,13 @@ def deploy() -> bool:
 @public
 def update(script: bytes, manifest: bytes):
     """
+    Upgrade the contract.
+
     :param script: the contract script
     :type script: bytes
     :param manifest: the contract manifest
     :type manifest: bytes
-    Upgrades the contract
-
+    :raise AssertionError: raised if witness is not owner
     """
     assert verify()
     update_contract(script, manifest) 
@@ -524,8 +578,9 @@ def update(script: bytes, manifest: bytes):
 @public
 def destroy():
     """
-    Destroys the contract.
+    Destroy the contract.
 
+    :raise AssertionError: raised if witness is not owner
     """
     assert verify()
     destroy_contract() 
@@ -558,38 +613,35 @@ def onNEP17Payment(from: UInt160, amount: int, data: Any):
     if calling_script_hash != GAS:
         abort()
 
-
-def post_transfer(from_address: Union[UInt160, None], to_address: Union[UInt160, None], token: bytes, data: Any):
+def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: bytes, data: Any):
     """
-    Checks if the one receiving NEP17 tokens is a smart contract and if it's one the onPayment method will be called
+    Post Transfer logic - internal
 
-    :param from_address: the address of the sender
-    :type from_address: UInt160
-    :param to_address: the address of the receiver
-    :type to_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent
-    :type amount: int
+    :param token_owner: the address of the sender
+    :type token_owner: UInt160
+    :param to: the address of the receiver
+    :type to: UInt160
+    :param tokenId: the token hash as bytes
+    :type tokenId: bytes
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
-    on_transfer(from_address, to_address, 1, token)
-    if not isinstance(to_address, None):    # TODO: change to 'is not None' when `is` semantic is implemented
-        contract = get_contract(to_address)
+    on_transfer(token_owner, to, 1, tokenId)
+    if not isinstance(to, None):    # TODO: change to 'is not None' when `is` semantic is implemented
+        contract = get_contract(to)
         if not isinstance(contract, None):      # TODO: change to 'is not None' when `is` semantic is implemented
-            call_contract(to_address, 'onNEP11Payment', [from_address, 1, token, data])
+            call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
             pass
 
 def internal_burn(token: bytes) -> bool:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Burn a token - internal
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
-    :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param tokenId: the token to burn
+    :type tokenId: ByteString
+    :return: whether the burn was successful.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
-
     ctx = get_context()
     owner = get_owner_of(ctx, token)
 
@@ -609,21 +661,22 @@ def internal_burn(token: bytes) -> bool:
 
 def internal_mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     """
-    Mints new tokens. This is not a NEP-17 standard method, it's only being use to complement the onPayment method
+    Mint new token - internal
 
-    :param account: the address of the account that is sending cryptocurrency to this contract
+    :param account: the address of the account that is minting token
     :type account: UInt160
-    :param amount: the amount of gas to be refunded
-    :type amount: int
-    :raise AssertionError: raised if amount is less than than 0
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     """
-
     ctx = get_context()
-
     total = totalSupply()
     newNFT = bytearray(TOKEN_SYMBOL_B)
     nftData = 0
-
     token_id = get(TOKEN_COUNT, ctx).to_int() + 1
     put(TOKEN_COUNT, token_id, ctx)
     tx = cast(Transaction, script_container)
@@ -634,18 +687,17 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) 
     newNFT.append(nftData)
 
     nftmeta = json_serialize(meta)
+    debug(['nftmeta: ', nftmeta])
     token = newNFT
-
     debug(['locked: ', lockedContent])
+
     add_token(ctx, account, token)
     add_locked_content(ctx, token, lockedContent)
     add_meta(ctx, token, nftmeta)
-    set_owner_of(ctx, token, account)
+    add_owner_of(ctx, token, account)
     add_to_balance(ctx, account, 1)
     add_to_supply(ctx, 1)
-
     post_transfer(None, account, token, None)
-
     return token
 
 def get_meta(ctx: StorageContext, token: bytes) -> bytes:
@@ -655,52 +707,53 @@ def get_meta(ctx: StorageContext, token: bytes) -> bytes:
 
 def remove_meta(ctx: StorageContext, token: bytes):
     key = mk_meta_key(token)
+    # debug(['remove meta: ', key, token])
     delete(key, ctx)
 
 def add_meta(ctx: StorageContext, token: bytes, meta: bytes):
     key = mk_meta_key(token)
+    # debug(['add meta: ', key, token])
     put(key, meta, ctx)
+
+def remove_token(ctx: StorageContext, owner: UInt160, token: bytes):
+    key = mk_account_prefix(owner) + token
+    # debug(['remove token: ', key, token])
+    delete(key, ctx)
 
 def add_token(ctx: StorageContext, owner: UInt160, token: bytes):
     key = mk_account_prefix(owner) + token
     # debug(['add token: ', key, token])
     put(key, token, ctx)
 
-def remove_token(ctx: StorageContext, owner: UInt160, token: bytes):
-    key = mk_account_prefix(owner) + token
-    delete(key, ctx)
-
-def remove_owner_of(ctx: StorageContext, token: bytes):
-    key = mk_token_key(token)
-    delete(key, ctx)
-
-def set_owner_of(ctx: StorageContext, token: bytes, owner: UInt160):
-    key = mk_token_key(token)
-    put(key, owner, ctx)
-
 def get_owner_of(ctx: StorageContext, token: bytes) -> UInt160:
     key = mk_token_key(token)
     owner = get(key, ctx)
     return UInt160(owner)
 
-def add_locked_content(ctx: StorageContext, token: bytes, content: bytes):
-    key = mk_locked_key(token)
-    put(key, content, ctx)
-    debug(['locked2: ', get(key, ctx), key])
+def remove_owner_of(ctx: StorageContext, token: bytes):
+    key = mk_token_key(token)
+    # debug(['remove owner of: ', key, token])
+    delete(key, ctx)
+
+def add_owner_of(ctx: StorageContext, token: bytes, owner: UInt160):
+    key = mk_token_key(token)
+    # debug(['set owner of: ', key, token])
+    put(key, owner, ctx)
 
 def get_locked_content(ctx: StorageContext, token: bytes) -> bytes:
     key = mk_locked_key(token)
     val = get(key, ctx)
-    debug(['locked3: ', val, key])
     return val
 
 def remove_locked_content(ctx: StorageContext, token: bytes):
     key = mk_locked_key(token)
+    # debug(['remove locked content: ', key, token])
     delete(key, ctx)
 
-def set_mint_fee(ctx: StorageContext, amount: int) -> int:
-    put(MINT_FEE, amount, ctx)
-    return get_mint_fee(ctx)
+def add_locked_content(ctx: StorageContext, token: bytes, content: bytes):
+    key = mk_locked_key(token)
+    # debug(['add locked content: ', key, token])
+    put(key, content, ctx)
 
 def get_mint_fee(ctx: StorageContext) -> int:
     fee = get(MINT_FEE, ctx).to_int()
@@ -708,22 +761,31 @@ def get_mint_fee(ctx: StorageContext) -> int:
         return 0
     return fee
 
+def set_mint_fee(ctx: StorageContext, amount: int) -> int:
+    put(MINT_FEE, amount, ctx)
+    # debug(['set mint fee: ', amount])
+    return get_mint_fee(ctx)
+
 def get_locked_view_counter(ctx: StorageContext, token: bytes) -> int:
     key = mk_lv_key(token)
+    # debug(['get locked view counter: ', key, token])
     return get(key, ctx).to_int()
 
 def incr_locked_view_counter(ctx: StorageContext, token: bytes):
     key = mk_lv_key(token)
     count = get(key, ctx).to_int() + 1
+    # debug(['incr locked view counter: ', key, token])
     put(key, count)
 
 def add_to_supply(ctx: StorageContext, amount: int):
     total = totalSupply() + (amount)
+    # debug(['add to supply: ', amount])
     put(SUPPLY_PREFIX, total)
 
 def add_to_balance(ctx: StorageContext, owner: UInt160, amount: int):
     old = balanceOf(owner)
     new = old + (amount)
+    # debug(['add to balance: ', amount])
 
     key = mk_balance_key(owner)
     if (new > 0):
