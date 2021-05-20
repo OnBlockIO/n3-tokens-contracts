@@ -13,7 +13,7 @@ from boa3_test.tests.test_classes.TestExecutionException import TestExecutionExc
 
 class GhostTest(BoaTest):
 
-    CONTRACT_PATH = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/ghost.nef'
+    CONTRACT_PATH = '/Users/vincent/Dev/GhostMarketContractN3/contracts/NEP11/GhostMarket.NFT.nef'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
@@ -124,6 +124,7 @@ class GhostTest(BoaTest):
                 '{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }'
             ]
 
+        lockedContent = b'superSecureLockedContent'
         result = self.run_smart_contract(engine, self.CONTRACT_PATH, 'multiMint', 
                 aux_address, tokenMeta, lockedContent, None,
                 signer_accounts=[aux_address],
@@ -355,7 +356,7 @@ class GhostTest(BoaTest):
             }
 
         token = self.run_smart_contract(engine, self.CONTRACT_PATH, 'mint', 
-                aux_address, tokenMeta, None,
+                aux_address, tokenMeta, "lockedContent", None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
