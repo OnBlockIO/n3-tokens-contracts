@@ -80,9 +80,7 @@ AUTH_ADDRESSES = b'AUTH_ADDR'
 # -------------------------------------------
 
 on_transfer = CreateNewEvent(
-    #MUST trigger when tokens are transferred, including zero value transfers.
-    #A token contract which creates new tokens MUST trigger a Transfer event with the from address set to null when tokens are created.
-    #A token contract which burns tokens MUST trigger a Transfer event with the to address set to null when tokens are burned.
+    #trigger when tokens are transferred, including zero value transfers.
     [
         ('from_addr', Union[UInt160, None]),
         ('to_addr', Union[UInt160, None]),
@@ -116,7 +114,7 @@ on_mint = CreateNewEvent(
 on_mint_fees_withdrawn = CreateNewEvent(
     #trigger when mint fees are withdrawn.
     [
-        ('from_addr', int),
+        ('from_addr', UInt160),
         ('value', int)
     ],
     'MintFeesWithdrawn'
@@ -291,7 +289,7 @@ def ownerOf(tokenId: bytes) -> UInt160:
     """
     ctx = get_context()
     owner = get_owner_of(ctx, tokenId)
-    return get_locked_content(ctx, owner)
+    return owner
 
 @public
 def tokens() -> Iterator:
@@ -586,24 +584,24 @@ def destroy():
     destroy_contract() 
 
 @public
-def onNEP11Payment(from: UInt160, amount: int, tokenId: bytes, data: Any):
+def onNEP11Payment(from_address: UInt160, amount: int, token: bytes, data: Any):
     """
-    :param from: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from: UInt160
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
     :param amount: the amount of cryptocurrency that is being sent to the this smart contract
     :type amount: int
-    :param tokenId: the token hash as bytes
-    :type tokenId: bytes
+    :param token: the token hash as bytes
+    :type token: bytes
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
     abort()
 
 @public
-def onNEP17Payment(from: UInt160, amount: int, data: Any):
+def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     """
-    :param from: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from: UInt160
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
     :param amount: the amount of cryptocurrency that is being sent to the this smart contract
     :type amount: int
     :param data: any pertinent data that might validate the transaction
