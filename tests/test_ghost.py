@@ -587,7 +587,7 @@ class GhostTest(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
 
-        # check if enough balance
+        # check initial balance is 0
         balance = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
@@ -598,10 +598,13 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, None,
                 signer_accounts=[self.OTHER_ACCOUNT_1],
                 expected_result_type=bytes)
-        ghost_balance_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
+        balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=int)
+        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
 
         # should have new balance
-        self.assertEqual(add_amount, ghost_balance_after)
+        self.assertEqual(fee, balance_after)
 
         # set mint fee to 200000 + mint + getFeeBalance
         fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 200000,
@@ -611,12 +614,12 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, None,
                 signer_accounts=[self.OTHER_ACCOUNT_1],
                 expected_result_type=bytes)
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
+        balance_after_updated = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
         
         # should have new balance
-        self.assertEqual(10000000 + 200000, ghost_balance_after)
+        self.assertEqual(balance_after_updated, balance_after + 200000)
 
         # withdraw fee
         success = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'withdrawFee', self.OWNER_SCRIPT_HASH,
@@ -674,7 +677,7 @@ class GhostTest(BoaTest):
         content = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContent', token,
                 signer_accounts=[self.OTHER_ACCOUNT_1],
                 expected_result_type=bytes)
-        self.assertEqual(self.LOCK_CONTENT, content)
+        self.assertEqual(b'lockedContent', content)
 
         # getLockedContentViewCount should have 1 view
         views = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContentViewCount', token,
