@@ -372,6 +372,26 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     return internal_mint(account, meta, lockedContent, data)
 
 @public
+def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
+    """
+    Mint new token.
+
+    :param account: the address of the account that is minting token
+    :type account: UInt160
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if address is not whitelisted
+    """
+    
+    assert isWhitelisted(account)
+
+    return internal_mint(account, meta, lockedContent, data)
+
+@public
 def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], data: Any) -> List[bytes]:
     """
     Mint new tokens.
@@ -476,7 +496,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     return get_locked_content(ctx, tokenId)
 
 @public
-def set_authorized_address(address: UInt160, authorized: bool) -> bool:
+def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
     """
     Configure address authorizations.
 
@@ -531,6 +551,21 @@ def verify() -> bool:
 
     #auth = cast(dict[UInt160, UInt160], deserialize(serialized))
     #if auth
+
+    return False
+
+@public
+def isWhitelisted(address: UInt160) -> bool:
+    """
+    Check if the address is allowed to mint without fees.
+
+    If the address is whitelisted, it's allowed to mint without any fees.
+
+    :return: whether the address is allowed to mint without fees
+    """
+
+    if (True):
+        return True
 
     return False
 
