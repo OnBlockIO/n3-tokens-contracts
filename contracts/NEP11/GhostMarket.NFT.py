@@ -695,12 +695,11 @@ def internal_burn(token: bytes) -> bool:
 
     remove_token(ctx, owner, token)
     remove_meta(ctx, token)
+    remove_locked_content(ctx, token)
     remove_owner_of(ctx, token)
     add_to_balance(ctx, owner, -1)
     add_to_supply(ctx, -1)
     
-    # TODO delete view count for locked content
-
     post_transfer(owner, None, token, None)
     return True
 
@@ -815,6 +814,11 @@ def get_locked_view_counter(ctx: StorageContext, token: bytes) -> int:
     key = mk_lv_key(token)
     # debug(['get locked view counter: ', key, token])
     return get(key, ctx).to_int()
+
+def remove_locked_view_counter(ctx: StorageContext, token: bytes):
+    key = mk_lv_key(token)
+    # debug(['remove locked view counter: ', key, token])
+    delete(key, ctx)
 
 def incr_locked_view_counter(ctx: StorageContext, token: bytes):
     key = mk_lv_key(token)
