@@ -48,6 +48,9 @@ DEPLOY_FEE = 10000000
 TOKEN_SYMBOL = 'GHOST'
 TOKEN_SYMBOL_B = b'GHOST'
 
+# Number of decimal places
+TOKEN_DECIMALS = 0
+
 # Whether the smart contract was deployed or not
 DEPLOYED = b'deployed'
 
@@ -163,7 +166,7 @@ debug = CreateNewEvent(
 #     notify(data, "DEBUG_CONTRACT")
 
 # -------------------------------------------
-# Methods
+# NEP-11 Methods
 # -------------------------------------------
 
 @public
@@ -189,7 +192,7 @@ def decimals() -> int:
 
     :return: the number of decimals used by the token.
     """
-    return 0
+    return TOKEN_DECIMALS
 
 @public
 def totalSupply() -> int:
@@ -275,6 +278,27 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     post_transfer(token_owner, to, tokenId, data)
     return True
 
+def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: bytes, data: Any):
+    """
+    Checks if the one receiving NEP11 tokens is a smart contract and if it's one the onPayment method will be called - internal
+
+    :param token_owner: the address of the sender
+    :type token_owner: UInt160
+    :param to: the address of the receiver
+    :type to: UInt160
+    :param tokenId: the token hash as bytes
+    :type tokenId: bytes
+    :param data: any pertinent data that might validate the transaction
+    :type data: Any
+    """
+    on_transfer(token_owner, to, 1, tokenId)
+    if not isinstance(to, None):    # TODO: change to 'is not None' when `is` semantic is implemented
+        contract = get_contract(to)
+        if not isinstance(contract, None):      # TODO: change to 'is not None' when `is` semantic is implemented
+            call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
+            pass
+
+
 @public
 def ownerOf(tokenId: bytes) -> UInt160:
     """
@@ -318,6 +342,63 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     meta = get_meta(ctx, tokenId)
     deserialized = json_deserialize(meta)
     return cast(dict[str, str], deserialized)
+
+@public
+def deploy() -> bool:
+    """
+    Deploy the contract.
+
+    :return: whether the deploy was successful. This method must return True only during the smart contract deploy.
+    """
+    if not check_witness(OWNER):
+        return False
+
+    if get(DEPLOYED).to_bool():
+        return False
+
+    put(DEPLOYED, True)
+    put(TOKEN_COUNT, 0)
+    put(MINT_FEE, DEPLOY_FEE)
+
+    auth: List[UInt160] = []
+    auth.append(OWNER)
+    serialized = serialize(auth)
+    put(AUTH_ADDRESSES, serialized)
+
+    on_deploy(OWNER, symbol())
+    return True
+
+@public
+def onNEP11Payment(from_address: UInt160, amount: int, token: bytes, data: Any):
+    """
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
+    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
+    :type amount: int
+    :param token: the token hash as bytes
+    :type token: bytes
+    :param data: any pertinent data that might validate the transaction
+    :type data: Any
+    """
+    abort()
+
+@public
+def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
+    """
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
+    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
+    :type amount: int
+    :param data: any pertinent data that might validate the transaction
+    :type data: Any
+    """
+    #Use calling_script_hash to identify if the incoming token is NEO or GAS
+    if calling_script_hash != GAS:
+        abort()
+
+# -------------------------------------------
+# GhostMarket Methods
+# -------------------------------------------
 
 @public
 def burn(tokenId: bytes) -> bool:
@@ -366,8 +447,12 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     if fee < 0:
         raise Exception("Mint fee can't be < 0")
 
-    if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
-        raise Exception("Fee payment failed!")
+    #if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
+    #    raise Exception("Fee payment failed!")
+    if fee > 0:
+        result = call_contract(GAS, 'transfer', [account, calling_script_hash, fee, None])
+        if result != True:
+                return False
 
     return internal_mint(account, meta, lockedContent, data)
 
@@ -570,31 +655,6 @@ def isWhitelisted(address: UInt160) -> bool:
     return False
 
 @public
-def deploy() -> bool:
-    """
-    Deploy the contract.
-
-    :return: whether the deploy was successful. This method must return True only during the smart contract deploy.
-    """
-    if not check_witness(OWNER):
-        return False
-
-    if get(DEPLOYED).to_bool():
-        return False
-
-    put(DEPLOYED, True)
-    put(TOKEN_COUNT, 0)
-    put(MINT_FEE, DEPLOY_FEE)
-
-    auth: List[UInt160] = []
-    auth.append(OWNER)
-    serialized = serialize(auth)
-    put(AUTH_ADDRESSES, serialized)
-
-    on_deploy(OWNER, symbol())
-    return True
-
-@public
 def update(script: bytes, manifest: bytes):
     """
     Upgrade the contract.
@@ -617,54 +677,6 @@ def destroy():
     """
     assert verify()
     destroy_contract() 
-
-@public
-def onNEP11Payment(from_address: UInt160, amount: int, token: bytes, data: Any):
-    """
-    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
-    :type amount: int
-    :param token: the token hash as bytes
-    :type token: bytes
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    abort()
-
-@public
-def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
-    """
-    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
-    :type amount: int
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    #Use calling_script_hash to identify if the incoming token is NEO or GAS
-    if calling_script_hash != GAS:
-        abort()
-
-def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: bytes, data: Any):
-    """
-    Post Transfer logic - internal
-
-    :param token_owner: the address of the sender
-    :type token_owner: UInt160
-    :param to: the address of the receiver
-    :type to: UInt160
-    :param tokenId: the token hash as bytes
-    :type tokenId: bytes
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    on_transfer(token_owner, to, 1, tokenId)
-    if not isinstance(to, None):    # TODO: change to 'is not None' when `is` semantic is implemented
-        contract = get_contract(to)
-        if not isinstance(contract, None):      # TODO: change to 'is not None' when `is` semantic is implemented
-            call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
-            pass
 
 def internal_burn(token: bytes) -> bool:
     """
