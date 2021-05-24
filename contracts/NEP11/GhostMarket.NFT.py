@@ -475,19 +475,9 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], dat
     if not isinstance(meta, list):
         raise Exception("meta format should be a list!")
 
-    ctx = get_context()
-    fee = get_mint_fee(ctx)
-
-    if fee < 0:
-        raise Exception("Mint fee can't be < 0")
-
-    if fee > 0:
-        if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
-            raise Exception("Fee payment failed!")
-
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
-        nfts.append(internal_mint(account, meta[i], lockedContent[i], data))
+        nfts.append(mint(account, meta[i], lockedContent[i], data))
     return nfts
 
 @public
