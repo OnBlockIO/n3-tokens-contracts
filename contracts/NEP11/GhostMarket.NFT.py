@@ -444,17 +444,51 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     """
     ctx = get_context()
     fee = get_mint_fee(ctx)
+
     if fee < 0:
         raise Exception("Mint fee can't be < 0")
 
-    #if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
-    #    raise Exception("Fee payment failed!")
     if fee > 0:
-        result = call_contract(GAS, 'transfer', [account, calling_script_hash, fee, None])
-        if result != True:
-                return False
+        if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
+            raise Exception("Fee payment failed!")
 
     return internal_mint(account, meta, lockedContent, data)
+
+@public
+def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], data: Any) -> List[bytes]:
+    """
+    Mint new tokens.
+
+    :param account: the address of the account that is minting tokens
+    :type account: UInt160
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
+    or if lockContent or meta is not a list
+    """
+    if not isinstance(lockedContent, list):
+        raise Exception("lock content format should be a list!")
+    if not isinstance(meta, list):
+        raise Exception("meta format should be a list!")
+
+    ctx = get_context()
+    fee = get_mint_fee(ctx)
+
+    if fee < 0:
+        raise Exception("Mint fee can't be < 0")
+
+    if fee > 0:
+        if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
+            raise Exception("Fee payment failed!")
+
+    nfts: List[bytes] = []
+    for i in range(0, len(meta)):
+        nfts.append(internal_mint(account, meta[i], lockedContent[i], data))
+    return nfts
 
 @public
 def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
@@ -475,26 +509,6 @@ def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, data: Any) ->
     assert isWhitelisted(account)
 
     return internal_mint(account, meta, lockedContent, data)
-
-@public
-def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], data: Any) -> List[bytes]:
-    """
-    Mint new tokens.
-
-    :param account: the address of the account that is minting tokens
-    :type account: UInt160
-    :param meta: the metadata to use for this token
-    :type meta: str
-    :param lockedContent: the lock content to use for this token
-    :type lockedContent: bytes
-    :param data: whatever data is pertinent to the mint method
-    :type data: Any
-    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
-    """
-    nfts: List[bytes] = []
-    for i in range(0, len(meta)):
-        nfts.append(mint(account, meta[i], lockedContent[i], data))
-    return nfts
 
 @public
 def withdrawFee(account: UInt160) -> bool:
