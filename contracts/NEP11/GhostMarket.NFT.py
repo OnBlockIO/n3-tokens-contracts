@@ -37,10 +37,6 @@ def manifest_metadata() -> NeoMetadata:
 # TOKEN SETTINGS
 # -------------------------------------------
 
-# Script hash of the contract owner
-# OWNER = UInt160(b'@\x1fA%\x1513)\xbd^\xac\xc4!\x1c**\x0elW\x96')
-OWNER = UInt160(b'\x96Wl\x0e**\x1c!\xc4\xac^\xbd)31\x15%A\x1f@')
-
 #Fee on deploy
 DEPLOY_FEE = 10000000
 
@@ -66,6 +62,7 @@ BALANCE_PREFIX = b'B'
 SUPPLY_PREFIX = b'S'
 META_PREFIX = b'M'
 LOCKED_VIEW_COUNT = b'LVC'
+ROYALTIES_PREFIX= b'ROY'
 
 
 # -------------------------------------------
@@ -76,7 +73,6 @@ TOKEN_COUNT = b'TC'
 PAUSED = b'PAUSED'
 MINT_FEE = b'MINT_FEE'
 AUTH_ADDRESSES = b'AUTH_ADDR'
-
 
 # -------------------------------------------
 # Events
@@ -150,20 +146,16 @@ on_deploy = CreateNewEvent(
     'Deploy'
 )
 
+# -------------------------------------------
+# DEBUG
+# -------------------------------------------
+
 debug = CreateNewEvent(
     [
         ('params', list),
     ],
     'Debug'
 )
-
-
-# -------------------------------------------
-# DEBUG
-# -------------------------------------------
-
-# def debug(data: list):
-#     notify(data, "DEBUG_CONTRACT")
 
 # -------------------------------------------
 # NEP-11 Methods
@@ -246,8 +238,12 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     The parameter tokenId SHOULD be a valid NFT. If not, this method SHOULD throw an exception.
     The function SHOULD return false if the token that will be transferred has more than one owner.
     If the method succeeds, it MUST fire the Transfer event, and MUST return true, even if the token is sent to the owner.
-    If the receiver is a deployed contract, the function MUST call onNEP11Payment method on receiver contract with the data parameter from transfer AFTER firing the Transfer event.
-    The function SHOULD check whether the owner address equals the caller contract hash. If so, the transfer SHOULD be processed; If not, the function SHOULD use the SYSCALL Neo.Runtime.CheckWitness to verify the transfer.
+    If the receiver is a deployed contract, the function MUST call onNEP11Payment method on receiver contract with the
+    data parameter from transfer AFTER firing the Transfer event.
+
+    The function SHOULD check whether the owner address equals the caller contract hash. If so, the transfer SHOULD be
+    processed; If not, the function SHOULD use the SYSCALL Neo.Runtime.CheckWitness to verify the transfer.
+
     If the transfer is not processed, the function SHOULD return false.
 
     :param to: the address to transfer to
@@ -265,7 +261,7 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     ctx = get_context()
     token_owner = get_owner_of(ctx, tokenId)
 
-    if (not check_witness(token_owner)):
+    if not check_witness(token_owner):
         return False
 
     if (token_owner != to):
@@ -330,8 +326,7 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     """
     Get the properties of a token.
 
-    Returns a serialized NVM object containing the properties for the given NFT. The NVM object must conform to the "NEO NFT Metadata JSON Schema".
-    The parameter tokenId SHOULD be a valid NFT. If not, this method SHOULD throw an exception.
+    The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenid)., an exception is thrown.
 
     :param tokenId: the token for which to check the properties
     :type tokenId: ByteString
@@ -340,33 +335,42 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     """
     ctx = get_context()
     meta = get_meta(ctx, tokenId)
+    debug(['meta: ', meta])
+    if len(meta) == 0:
+        raise Exception('Unable to parse metadata')
     deserialized = json_deserialize(meta)
+    debug(['deserialized: ', deserialized])
     return cast(dict[str, str], deserialized)
 
 @public
-def deploy() -> bool:
+def _deploy(data: Any, upgrade: bool):
     """
-    Deploy the contract.
+    The contracts initial entry point, on deployment.
 
-    :return: whether the deploy was successful. This method must return True only during the smart contract deploy.
+    : 
     """
-    if not check_witness(OWNER):
-        return False
+
+    if upgrade:
+        return
 
     if get(DEPLOYED).to_bool():
-        return False
+        abort()
+
+    owner = calling_script_hash
+    # TODO calling_scirpt_hash is null on TestEngine
+    if owner is None:
+        owner = UInt160(b'\x96Wl\x0e**\x1c!\xc4\xac^\xbd)31\x15%A\x1f@')
 
     put(DEPLOYED, True)
     put(TOKEN_COUNT, 0)
     put(MINT_FEE, DEPLOY_FEE)
 
     auth: List[UInt160] = []
-    auth.append(OWNER)
+    auth.append(owner)
     serialized = serialize(auth)
     put(AUTH_ADDRESSES, serialized)
 
-    on_deploy(OWNER, symbol())
-    return True
+    on_deploy(owner, symbol())
 
 @public
 def onNEP11Payment(from_address: UInt160, amount: int, token: bytes, data: Any):
@@ -428,7 +432,7 @@ def multiBurn(tokens: List[bytes]) -> List[bool]:
     return burned
 
 @public
-def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
+def mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
     """
     Mint new token.
 
@@ -444,7 +448,6 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
     """
     ctx = get_context()
     fee = get_mint_fee(ctx)
-
     if fee < 0:
         raise Exception("Mint fee can't be < 0")
 
@@ -452,10 +455,10 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
         if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
             raise Exception("Fee payment failed!")
 
-    return internal_mint(account, meta, lockedContent, data)
+    return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], data: Any) -> List[bytes]:
+def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], royalties: List[str], data: Any) -> List[bytes]:
     """
     Mint new tokens.
 
@@ -477,11 +480,31 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], dat
 
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
-        nfts.append(mint(account, meta[i], lockedContent[i], data))
+        nfts.append(mint(account, meta[i], lockedContent[i], royalties[i], data))
     return nfts
 
 @public
-def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
+def getRoyalties(token: bytes) -> dict[str, int]:
+    """
+    Mint new token.
+
+    :param account: the address of the account that is minting token
+    :type account: UInt160
+    :param meta: the metadata to use for this token
+    :type meta: str
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
+    :param data: whatever data is pertinent to the mint method
+    :type data: Any
+    :raise AssertionError: raised if address is not whitelisted
+    """
+    
+    ctx = get_context()
+    serialized = get_royalties(ctx, token)
+    return cast(dict[str, int], json_deserialize(serialized))
+
+@public
+def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
     """
     Mint new token.
 
@@ -498,7 +521,8 @@ def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, data: Any) ->
     
     assert isWhitelisted(account)
 
-    return internal_mint(account, meta, lockedContent, data)
+    # TODO what about royalties when token is swapped?
+    return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
 def withdrawFee(account: UInt160) -> bool:
@@ -635,11 +659,12 @@ def verify() -> bool:
     :return: whether the transaction signature is correct
     """
 
-    if check_witness(OWNER):
-        return True
-
-    #auth = cast(dict[UInt160, UInt160], deserialize(serialized))
-    #if auth
+    serialized = get(AUTH_ADDRESSES)
+    auth = cast(list[UInt160], deserialize(serialized))
+    for addr in auth: 
+        debug(["Verifying", addr])
+        if check_witness(addr):
+            return True
 
     return False
 
@@ -681,6 +706,7 @@ def destroy():
     """
     assert verify()
     destroy_contract() 
+    debug(['destroy called and done'])
 
 def internal_burn(token: bytes) -> bool:
     """
@@ -707,7 +733,7 @@ def internal_burn(token: bytes) -> bool:
     post_transfer(owner, None, token, None)
     return True
 
-def internal_mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) -> bytes:
+def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
     """
     Mint new token - internal
 
@@ -722,7 +748,6 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) 
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     """
     ctx = get_context()
-    total = totalSupply()
     newNFT = bytearray(TOKEN_SYMBOL_B)
     nftData = 0
     token_id = get(TOKEN_COUNT, ctx).to_int() + 1
@@ -745,6 +770,10 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, data: Any) 
     add_owner_of(ctx, token, account)
     add_to_balance(ctx, account, 1)
     add_to_supply(ctx, 1)
+
+    royalties_bytes = json_serialize(royalties)
+    add_royalties(ctx, token, royalties_bytes)
+
     post_transfer(None, account, token, None)
     return token
 
@@ -755,22 +784,22 @@ def get_meta(ctx: StorageContext, token: bytes) -> bytes:
 
 def remove_meta(ctx: StorageContext, token: bytes):
     key = mk_meta_key(token)
-    # debug(['remove meta: ', key, token])
+    debug(['remove meta: ', key, token])
     delete(key, ctx)
 
 def add_meta(ctx: StorageContext, token: bytes, meta: bytes):
     key = mk_meta_key(token)
-    # debug(['add meta: ', key, token])
+    debug(['add meta: ', key, token])
     put(key, meta, ctx)
 
 def remove_token(ctx: StorageContext, owner: UInt160, token: bytes):
     key = mk_account_prefix(owner) + token
-    # debug(['remove token: ', key, token])
+    debug(['remove token: ', key, token])
     delete(key, ctx)
 
 def add_token(ctx: StorageContext, owner: UInt160, token: bytes):
     key = mk_account_prefix(owner) + token
-    # debug(['add token: ', key, token])
+    debug(['add token: ', key, token])
     put(key, token, ctx)
 
 def get_owner_of(ctx: StorageContext, token: bytes) -> UInt160:
@@ -780,13 +809,24 @@ def get_owner_of(ctx: StorageContext, token: bytes) -> UInt160:
 
 def remove_owner_of(ctx: StorageContext, token: bytes):
     key = mk_token_key(token)
-    # debug(['remove owner of: ', key, token])
+    debug(['remove owner of: ', key, token])
     delete(key, ctx)
 
 def add_owner_of(ctx: StorageContext, token: bytes, owner: UInt160):
     key = mk_token_key(token)
-    # debug(['set owner of: ', key, token])
+    debug(['set owner of: ', key, token])
     put(key, owner, ctx)
+
+def get_royalties(ctx: StorageContext, token: bytes) -> bytes:
+    key = mk_roalties_key(token)
+    debug(['get roalties for token', key, token])
+    val = get(key, ctx)
+    return val
+
+def add_royalties(ctx: StorageContext, token: bytes, royalties: bytes):
+    key = mk_roalties_key(token)
+    debug(['add roalties for token', key, token])
+    put(key, royalties, ctx)
 
 def get_locked_content(ctx: StorageContext, token: bytes) -> bytes:
     key = mk_locked_key(token)
@@ -795,12 +835,12 @@ def get_locked_content(ctx: StorageContext, token: bytes) -> bytes:
 
 def remove_locked_content(ctx: StorageContext, token: bytes):
     key = mk_locked_key(token)
-    # debug(['remove locked content: ', key, token])
+    debug(['remove locked content: ', key, token])
     delete(key, ctx)
 
 def add_locked_content(ctx: StorageContext, token: bytes, content: bytes):
     key = mk_locked_key(token)
-    # debug(['add locked content: ', key, token])
+    debug(['add locked content: ', key, token])
     put(key, content, ctx)
 
 def get_mint_fee(ctx: StorageContext) -> int:
@@ -811,41 +851,40 @@ def get_mint_fee(ctx: StorageContext) -> int:
 
 def set_mint_fee(ctx: StorageContext, amount: int) -> int:
     put(MINT_FEE, amount, ctx)
-    # debug(['set mint fee: ', amount])
+    debug(['set mint fee: ', amount])
     return get_mint_fee(ctx)
 
 def get_locked_view_counter(ctx: StorageContext, token: bytes) -> int:
     key = mk_lv_key(token)
-    # debug(['get locked view counter: ', key, token])
+    debug(['get locked view counter: ', key, token])
     return get(key, ctx).to_int()
 
 def remove_locked_view_counter(ctx: StorageContext, token: bytes):
     key = mk_lv_key(token)
-    # debug(['remove locked view counter: ', key, token])
+    debug(['remove locked view counter: ', key, token])
     delete(key, ctx)
 
 def incr_locked_view_counter(ctx: StorageContext, token: bytes):
     key = mk_lv_key(token)
     count = get(key, ctx).to_int() + 1
-    # debug(['incr locked view counter: ', key, token])
+    debug(['incr locked view counter: ', key, token])
     put(key, count)
 
 def add_to_supply(ctx: StorageContext, amount: int):
     total = totalSupply() + (amount)
-    # debug(['add to supply: ', amount])
+    debug(['add to supply: ', amount])
     put(SUPPLY_PREFIX, total)
 
 def add_to_balance(ctx: StorageContext, owner: UInt160, amount: int):
     old = balanceOf(owner)
     new = old + (amount)
-    # debug(['add to balance: ', amount])
+    debug(['add to balance: ', amount])
 
     key = mk_balance_key(owner)
     if (new > 0):
         put(key, new, ctx)
     else:
         delete(key, ctx)
-
 
 ## helpers
 
@@ -854,6 +893,10 @@ def mk_account_prefix(address: UInt160) -> bytes:
 
 def mk_balance_key(address: UInt160) -> bytes:
     return BALANCE_PREFIX + address
+
+def mk_roalties_key(token: bytes) -> bytes:
+    return ROYALTIES_PREFIX + token
+
 
 def mk_token_key(token: bytes) -> bytes:
     return TOKEN_PREFIX + token
