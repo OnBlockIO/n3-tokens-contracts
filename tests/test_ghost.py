@@ -147,7 +147,8 @@ class GhostTest(BoaTest):
         auth_events = engine.get_events('Auth')
 
         # check if the event was triggered and the address was authorized
-        self.assertEqual(1, auth_events[0].arguments[1])
+        self.assertEqual(0, auth_events[0].arguments[1])
+        self.assertEqual(1, auth_events[0].arguments[2])
 
         # now deauthorize the address
         self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
@@ -157,6 +158,30 @@ class GhostTest(BoaTest):
         auth_events = engine.get_events('Auth')
         # check if the event was triggered and the address was authorized
         self.assertEqual(0, auth_events[1].arguments[1])
+        self.assertEqual(0, auth_events[1].arguments[2])
+
+    def test_ghost_whitelist(self):
+        engine = self.prepare_testengine()
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setWhitelistedAddress', 
+                self.OTHER_ACCOUNT_1, True,
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=bool)
+        auth_events = engine.get_events('Auth')
+
+        # check if the event was triggered and the address was authorized
+        self.assertEqual(1, auth_events[0].arguments[1])
+        self.assertEqual(1, auth_events[0].arguments[2])
+
+        # now deauthorize the address
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setWhitelistedAddress', 
+                self.OTHER_ACCOUNT_1, False,
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=bool)
+        auth_events = engine.get_events('Auth')
+        # check if the event was triggered and the address was authorized
+        self.assertEqual(1, auth_events[1].arguments[1])
+        self.assertEqual(0, auth_events[1].arguments[2])
+
 
     def test_ghost_mint(self):
         engine = self.prepare_testengine()
@@ -192,15 +217,15 @@ class GhostTest(BoaTest):
                 expected_result_type=bytes)
 
         print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=dict[str,str])
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=dict)
         print("props: " + str(properties))
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=dict[str, int])
+        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=dict)
         print("royalties: " + str(royalties))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
             properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties',
-                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=dict[str,str])
+                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=dict)
         print("props: " + str(properties))
 
         # check balances after
@@ -235,7 +260,7 @@ class GhostTest(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
-        # define custom meta & lock for multi
+        # define custom meta & lock & royalties for multi
         tokenMeta = [
                 '{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
                 '{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
@@ -262,7 +287,7 @@ class GhostTest(BoaTest):
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
                 aux_address, tokenMeta, lockedContent, royalties, None,
                 signer_accounts=[aux_address],
-                expected_result_type=list[bytes])
+                expected_result_type=list)
         print("result: " + str(result))
 
         # check tokens iterator after
@@ -406,7 +431,7 @@ class GhostTest(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
-        # define custom meta & lock for multi
+        # define custom meta & lock & royalties for multi
         tokenMeta = [
                 '{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
                 '{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
