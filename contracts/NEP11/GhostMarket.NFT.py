@@ -61,7 +61,7 @@ LOCKED_PREFIX = b'LC'
 BALANCE_PREFIX = b'B'
 SUPPLY_PREFIX = b'S'
 META_PREFIX = b'M'
-LOCKED_VIEW_COUNT = b'LVC'
+LOCKED_VIEW_COUNT_PREFIX = b'LVC'
 ROYALTIES_PREFIX= b'ROY'
 
 
@@ -955,4 +955,4 @@ def mk_meta_key(token: bytes) -> bytes:
     return META_PREFIX + token
 
 def mk_lv_key(token: bytes) -> bytes:
-    return LOCKED_VIEW_COUNT + token
+    return LOCKED_VIEW_COUNT_PREFIX + token
