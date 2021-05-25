@@ -73,6 +73,7 @@ TOKEN_COUNT = b'TC'
 PAUSED = b'PAUSED'
 MINT_FEE = b'MINT_FEE'
 AUTH_ADDRESSES = b'AUTH_ADDR'
+WL_ADDRESSES = b'WL_ADDR'
 
 # -------------------------------------------
 # Events
@@ -90,9 +91,10 @@ on_transfer = CreateNewEvent(
 )
 
 on_auth = CreateNewEvent(
-    #trigger when an address has been authorized.
+    #trigger when an address has been authorized/whitelisted.
     [
         ('authorized', UInt160),
+        ('type', int),
         ('add', bool),
     ],
     'Auth'
@@ -131,8 +133,7 @@ on_royalties_set = CreateNewEvent(
     #trigger when royalties are configured.
     [
         ('tokenId', bytes),
-        ('recipients', List[UInt160]),
-        ('bps', List[int])
+        ('value', str)
     ],
     'RoyaltiesSet'
 )
@@ -326,7 +327,7 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     """
     Get the properties of a token.
 
-    The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenid)., an exception is thrown.
+    The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenId), an exception is thrown.
 
     :param tokenId: the token for which to check the properties
     :type tokenId: ByteString
@@ -349,7 +350,6 @@ def _deploy(data: Any, upgrade: bool):
 
     : 
     """
-
     if upgrade:
         return
 
@@ -357,7 +357,7 @@ def _deploy(data: Any, upgrade: bool):
         abort()
 
     owner = calling_script_hash
-    # TODO calling_scirpt_hash is null on TestEngine
+    # TODO calling_script_hash is null on TestEngine
     if owner is None:
         owner = UInt160(b'\x96Wl\x0e**\x1c!\xc4\xac^\xbd)31\x15%A\x1f@')
 
@@ -369,6 +369,7 @@ def _deploy(data: Any, upgrade: bool):
     auth.append(owner)
     serialized = serialize(auth)
     put(AUTH_ADDRESSES, serialized)
+    put(WL_ADDRESSES, serialized)
 
     on_deploy(owner, symbol())
 
@@ -442,6 +443,8 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data
     :type meta: str
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
+    :param royalties: the royalties to use for this token
+    :type royalties: str
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
@@ -468,6 +471,8 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], roy
     :type meta: str
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
+    :param royalties: the royalties to use for this token
+    :type royalties: str
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
@@ -477,6 +482,8 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], roy
         raise Exception("lock content format should be a list!")
     if not isinstance(meta, list):
         raise Exception("meta format should be a list!")
+    if not isinstance(royalties, list):
+        raise Exception("royalties format should be a list!")
 
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
@@ -484,9 +491,9 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], roy
     return nfts
 
 @public
-def getRoyalties(token: bytes) -> dict[str, int]:
+def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
     """
-    Mint new token.
+    Mint new token with no fees - whitelisted only.
 
     :param account: the address of the account that is minting token
     :type account: UInt160
@@ -498,31 +505,23 @@ def getRoyalties(token: bytes) -> dict[str, int]:
     :type data: Any
     :raise AssertionError: raised if address is not whitelisted
     """
-    
+    assert isWhitelisted()
+
+    # TODO what about royalties handling with mintWithURI()
+    return internal_mint(account, meta, lockedContent, royalties, data)
+
+@public
+def getRoyalties(token: bytes) -> dict[str, int]:
+    """
+    Get a token royalties values.
+
+    :param tokenId: the token to get royalties values
+    :type tokenId: ByteString
+    :return: dictionnary of addresses and values for this token royalties.
+    """
     ctx = get_context()
     serialized = get_royalties(ctx, token)
     return cast(dict[str, int], json_deserialize(serialized))
-
-@public
-def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
-    """
-    Mint new token.
-
-    :param account: the address of the account that is minting token
-    :type account: UInt160
-    :param meta: the metadata to use for this token
-    :type meta: str
-    :param lockedContent: the lock content to use for this token
-    :type lockedContent: bytes
-    :param data: whatever data is pertinent to the mint method
-    :type data: Any
-    :raise AssertionError: raised if address is not whitelisted
-    """
-    
-    assert isWhitelisted(account)
-
-    # TODO what about royalties when token is swapped?
-    return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
 def withdrawFee(account: UInt160) -> bool:
@@ -611,7 +610,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
 @public
 def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
     """
-    Configure address authorizations.
+    Configure authorizated addresses.
 
     When this contract address is included in the transaction signature,
     this method will be triggered as a VerificationTrigger to verify that the signature is correct.
@@ -639,11 +638,50 @@ def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
             auth.append(address)
 
         put(AUTH_ADDRESSES, serialize(auth))
-        on_auth(address, True)
+        on_auth(address, 0, True)
     else:
         auth.remove(address)
         put(AUTH_ADDRESSES, serialize(auth))
-        on_auth(address, False)
+        on_auth(address, 0, False)
+
+    return True
+
+@public
+def setWhitelistedAddress(address: UInt160, authorized: bool) -> bool:
+    """
+    Configure whitelisted addresses.
+
+    When this contract address is included in the transaction signature,
+    this method will be triggered as a VerificationTrigger to verify that the signature is correct.
+    For example, this method needs to be called when using the no fee mint method.
+
+    :param address: the address of the account that is being authorized
+    :type address: UInt160
+    :param authorized: authorization status of this address
+    :type authorized: bool
+    :return: whether the transaction signature is correct
+    """
+    if not verify():
+        return False
+
+    serialized = get(WL_ADDRESSES)
+    auth = cast(list[UInt160], deserialize(serialized))
+
+    if authorized:
+        found = False
+        for i in auth:
+            if i == address:
+                found = True
+
+        if not found:
+            auth.append(address)
+
+        put(WL_ADDRESSES, serialize(auth))
+        on_auth(address, 1, True)
+    else:
+        auth.remove(address)
+        put(WL_ADDRESSES, serialize(auth))
+        on_auth(address, 1, False)
 
     return True
 
@@ -658,7 +696,6 @@ def verify() -> bool:
 
     :return: whether the transaction signature is correct
     """
-
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
     for addr in auth: 
@@ -669,7 +706,7 @@ def verify() -> bool:
     return False
 
 @public
-def isWhitelisted(address: UInt160) -> bool:
+def isWhitelisted() -> bool:
     """
     Check if the address is allowed to mint without fees.
 
@@ -677,9 +714,12 @@ def isWhitelisted(address: UInt160) -> bool:
 
     :return: whether the address is allowed to mint without fees
     """
-
-    if (True):
-        return True
+    serialized = get(WL_ADDRESSES)
+    auth = cast(list[UInt160], deserialize(serialized))
+    for addr in auth: 
+        debug(["Verifying", addr])
+        if check_witness(addr):
+            return True
 
     return False
 
@@ -743,6 +783,8 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: 
     :type meta: str
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
+    :param royalties: the royalties to use for this token
+    :type royalties: str
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
@@ -759,20 +801,23 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: 
         nftData = nftData + serialize(data).to_int()
     newNFT.append(nftData)
 
-    nftmeta = json_serialize(meta)
-    debug(['nftmeta: ', nftmeta])
     token = newNFT
-    debug(['locked: ', lockedContent])
-
     add_token(ctx, account, token)
-    add_locked_content(ctx, token, lockedContent)
-    add_meta(ctx, token, nftmeta)
     add_owner_of(ctx, token, account)
     add_to_balance(ctx, account, 1)
     add_to_supply(ctx, 1)
 
+    nftmeta = json_serialize(meta)
+    add_meta(ctx, token, nftmeta)
+    debug(['nftmeta: ', nftmeta])
+
+    add_locked_content(ctx, token, lockedContent)
+    debug(['locked: ', lockedContent])
+
     royalties_bytes = json_serialize(royalties)
     add_royalties(ctx, token, royalties_bytes)
+    on_royalties_set(token, royalties)
+    debug(['royalties: ', royalties])
 
     post_transfer(None, account, token, None)
     return token
@@ -818,14 +863,14 @@ def add_owner_of(ctx: StorageContext, token: bytes, owner: UInt160):
     put(key, owner, ctx)
 
 def get_royalties(ctx: StorageContext, token: bytes) -> bytes:
-    key = mk_roalties_key(token)
-    debug(['get roalties for token', key, token])
+    key = mk_royalties_key(token)
+    debug(['get royalties for token', key, token])
     val = get(key, ctx)
     return val
 
 def add_royalties(ctx: StorageContext, token: bytes, royalties: bytes):
-    key = mk_roalties_key(token)
-    debug(['add roalties for token', key, token])
+    key = mk_royalties_key(token)
+    debug(['add royalties for token', key, token])
     put(key, royalties, ctx)
 
 def get_locked_content(ctx: StorageContext, token: bytes) -> bytes:
@@ -894,7 +939,7 @@ def mk_account_prefix(address: UInt160) -> bytes:
 def mk_balance_key(address: UInt160) -> bytes:
     return BALANCE_PREFIX + address
 
-def mk_roalties_key(token: bytes) -> bytes:
+def mk_royalties_key(token: bytes) -> bytes:
     return ROYALTIES_PREFIX + token
 
 
