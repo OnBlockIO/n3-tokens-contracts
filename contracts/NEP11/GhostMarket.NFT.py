@@ -29,7 +29,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Mathias Enzensberger, Vincent Geneste"
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
-    meta.supportedstandards = "NEP-11"
+    meta.supportedstandards = "NEP-11" # TODO: NOT SUPPORTED YET
     return meta
 
 
@@ -455,8 +455,10 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data
         raise Exception("Mint fee can't be < 0")
 
     if fee > 0:
-        if not cast(bool, call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])):
-            raise Exception("Fee payment failed!")
+        call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
+        #result = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
+        #if not cast(bool, result):
+        #    raise Exception("Fee payment failed!")
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
