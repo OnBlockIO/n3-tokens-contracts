@@ -547,12 +547,12 @@ class GhostTest(BoaTest):
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
 
-        # getMintFee should retrurn the updated fee
+        # getMintFee should return the updated fee
         fee_event = engine.get_events('MintFeeUpdated')
         updated_fee = fee_event[0].arguments[0]
         self.assertEqual(updated_fee, 1000)
 
-        # getMintFee should retrurn the updated fee
+        # getMintFee should return the updated fee
         fee2 = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
         self.assertEqual(fee2, updated_fee)
 
