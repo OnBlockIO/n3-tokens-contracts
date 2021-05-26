@@ -37,7 +37,7 @@ def manifest_metadata() -> NeoMetadata:
 # TOKEN SETTINGS
 # -------------------------------------------
 
-#Fee on deploy
+# Fee on deploy
 DEPLOY_FEE = 10000000
 
 # Symbol of the Token
@@ -61,8 +61,8 @@ LOCKED_PREFIX = b'LC'
 BALANCE_PREFIX = b'B'
 SUPPLY_PREFIX = b'S'
 META_PREFIX = b'M'
-LOCKED_VIEW_COUNT_PREFIX = b'LVC'
-ROYALTIES_PREFIX= b'ROY'
+LOCKED_VIEW_COUNT_PREFIX = b'LV'
+ROYALTIES_PREFIX = b'R'
 
 
 # -------------------------------------------
@@ -70,10 +70,11 @@ ROYALTIES_PREFIX= b'ROY'
 # -------------------------------------------
 
 TOKEN_COUNT = b'TC'
-PAUSED = b'PAUSED'
-MINT_FEE = b'MINT_FEE'
-AUTH_ADDRESSES = b'AUTH_ADDR'
-WL_ADDRESSES = b'WL_ADDR'
+PAUSED = b'P'
+MINT_FEE = b'F'
+AUTH_ADDRESSES = b'AU'
+WL_ADDRESSES = b'W'
+
 
 # -------------------------------------------
 # Events
@@ -104,15 +105,12 @@ on_mint = CreateNewEvent(
     #trigger when a token has been minted.
     [
         ('creator', UInt160),
-        ('tokenId', bytes),
-        ('tokenURI', str),
-        ('externalURI', str),
-        ('mint_fees', int)
+        ('tokenId', bytes)
     ],
     'Mint'
 )
 
-on_mint_fees_withdrawn = CreateNewEvent(
+on_withdraw_mint_fee = CreateNewEvent(
     #trigger when mint fees are withdrawn.
     [
         ('from_addr', UInt160),
@@ -128,15 +126,6 @@ on_update_mint_fee = CreateNewEvent(
     ],
     'MintFeeUpdated'
 )
-
-# on_royalties_set = CreateNewEvent(
-#     #trigger when royalties are configured.
-#     [
-#         ('tokenId', bytes),
-#         ('value', bytes)
-#     ],
-#     'RoyaltiesSet'
-# )
 
 on_deploy = CreateNewEvent(
     #trigger on contract deploy.
@@ -509,9 +498,11 @@ def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: 
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: str
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
+    :param royalties: the royalties to use for this token
+    :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if address is not whitelisted
@@ -528,7 +519,7 @@ def getRoyalties(token: bytes) -> bytes:
 
     :param tokenId: the token to get royalties values
     :type tokenId: ByteString
-    :return: dictionnary of addresses and values for this token royalties.
+    :return: bytes of addresses and values for this token royalties.
     """
     ctx = get_context()
     return get_royalties(ctx, token)
@@ -546,7 +537,7 @@ def withdrawFee(account: UInt160) -> bool:
     """
     assert verify()
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash]))
-    on_mint_fees_withdrawn(account, current_balance)
+    on_withdraw_mint_fee(account, current_balance)
     return cast(bool, call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None]))
 
 @public
@@ -577,7 +568,6 @@ def setMintFee(fee: int):
 
     :param fee: fee to be used when minting
     :type fee: int
-    :return: configured value of mint fees.
     :raises AssertionError: raised if witness is not authorized
     :emits MintFeeUpdated
     """
@@ -824,11 +814,10 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     debug(['locked: ', lockedContent])
 
     add_royalties(ctx, token, royalties)
-    # Unecessary event
-    # on_royalties_set(token, royalties)
     debug(['royalties: ', royalties])
 
     post_transfer(None, account, token, None)
+    on_mint(account, token_id)
     return token
 
 def get_meta(ctx: StorageContext, token: bytes) -> bytes:
@@ -904,8 +893,8 @@ def get_mint_fee(ctx: StorageContext) -> int:
     return fee
 
 def set_mint_fee(ctx: StorageContext, amount: int):
-    put(MINT_FEE, amount, ctx)
     debug(['set mint fee: ', amount])
+    put(MINT_FEE, amount, ctx)
 
 def get_locked_view_counter(ctx: StorageContext, token: bytes) -> int:
     key = mk_lv_key(token)
@@ -949,7 +938,6 @@ def mk_balance_key(address: UInt160) -> bytes:
 
 def mk_royalties_key(token: bytes) -> bytes:
     return ROYALTIES_PREFIX + token
-
 
 def mk_token_key(token: bytes) -> bytes:
     return TOKEN_PREFIX + token
