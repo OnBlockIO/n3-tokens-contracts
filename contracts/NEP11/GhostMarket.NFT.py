@@ -118,25 +118,25 @@ on_mint_fees_withdrawn = CreateNewEvent(
         ('from_addr', UInt160),
         ('value', int)
     ],
-    'MintFeesWithdrawn'
+    'MintFeeWithdrawn'
 )
 
-on_mint_fees_updated = CreateNewEvent(
+on_update_mint_fee = CreateNewEvent(
     #trigger when mint fees are updated.
     [
         ('value', int)
     ],
-    'MintFeesUpdated'
+    'MintFeeUpdated'
 )
 
-on_royalties_set = CreateNewEvent(
-    #trigger when royalties are configured.
-    [
-        ('tokenId', bytes),
-        ('value', str)
-    ],
-    'RoyaltiesSet'
-)
+# on_royalties_set = CreateNewEvent(
+#     #trigger when royalties are configured.
+#     [
+#         ('tokenId', bytes),
+#         ('value', bytes)
+#     ],
+#     'RoyaltiesSet'
+# )
 
 on_deploy = CreateNewEvent(
     #trigger on contract deploy.
@@ -323,7 +323,7 @@ def tokens() -> Iterator:
     return find(TOKEN_PREFIX, ctx)
 
 @public
-def properties(tokenId: bytes) -> Dict[str, str]:
+def properties(tokenId: bytes) -> bytes:
     """
     Get the properties of a token.
 
@@ -338,10 +338,8 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     meta = get_meta(ctx, tokenId)
     debug(['meta: ', meta])
     if len(meta) == 0:
-        raise Exception('Unable to parse metadata')
-    deserialized = json_deserialize(meta)
-    debug(['deserialized: ', deserialized])
-    return cast(dict[str, str], deserialized)
+        raise Exception('No metadata available for token')
+    return meta
 
 @public
 def _deploy(data: Any, upgrade: bool):
@@ -356,22 +354,27 @@ def _deploy(data: Any, upgrade: bool):
     if get(DEPLOYED).to_bool():
         abort()
 
-    owner = calling_script_hash
-    # TODO calling_script_hash is null on TestEngine
-    if owner is None:
+    tx = cast(Transaction, script_container)
+#DEBUG_START
+    if tx.sender is None:
         owner = UInt160(b'\x96Wl\x0e**\x1c!\xc4\xac^\xbd)31\x15%A\x1f@')
+#DEBUG_END
 
     put(DEPLOYED, True)
     put(TOKEN_COUNT, 0)
     put(MINT_FEE, DEPLOY_FEE)
 
     auth: List[UInt160] = []
-    auth.append(owner)
+    auth.append(tx.sender)
     serialized = serialize(auth)
     put(AUTH_ADDRESSES, serialized)
-    put(WL_ADDRESSES, serialized)
 
-    on_deploy(owner, symbol())
+    wl: List[UInt160] = []
+    wl.append(tx.sender)
+    wl_serialized = serialize(auth)
+    put(WL_ADDRESSES, wl_serialized)
+
+    on_deploy(tx.sender, symbol())
 
 @public
 def onNEP11Payment(from_address: UInt160, amount: int, token: bytes, data: Any):
@@ -433,18 +436,18 @@ def multiBurn(tokens: List[bytes]) -> List[bool]:
     return burned
 
 @public
-def mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
+def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token.
 
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: str
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
     :param royalties: the royalties to use for this token
-    :type royalties: str
+    :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
@@ -454,38 +457,44 @@ def mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data
     if fee < 0:
         raise Exception("Mint fee can't be < 0")
 
+    if not check_witness(account):
+        raise Exception("tx not signed!")
+
     if fee > 0:
-        call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        #result = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        #if not cast(bool, result):
-        #    raise Exception("Fee payment failed!")
+        debug(["before fee transfer", fee, UInt160(executing_script_hash), GAS])
+        current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
+        debug(["gas before", current_balance])
+
+        result = call_contract(GAS, 'transfer', [UInt160(calling_script_hash), UInt160(executing_script_hash), fee, None])
+
+        debug(["after fee transfer", result])
+        current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
+        debug(["gas after", current_balance])
+        if not cast(bool, result):
+            raise Exception("Fee payment failed!")
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], royalties: List[str], data: Any) -> List[bytes]:
+def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], royalties: List[bytes], data: Any) -> List[bytes]:
     """
     Mint new tokens.
 
     :param account: the address of the account that is minting tokens
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: str
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
     :param royalties: the royalties to use for this token
-    :type royalties: str
+    :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     or if lockContent or meta is not a list
     """
-    if not isinstance(lockedContent, list):
-        raise Exception("lock content format should be a list!")
     if not isinstance(meta, list):
         raise Exception("meta format should be a list!")
-    if not isinstance(royalties, list):
-        raise Exception("royalties format should be a list!")
 
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
@@ -493,7 +502,7 @@ def multiMint(account: UInt160, meta: List[str], lockedContent: List[bytes], roy
     return nfts
 
 @public
-def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
+def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token with no fees - whitelisted only.
 
@@ -513,7 +522,7 @@ def mintWithURI(account: UInt160, meta: str, lockedContent: bytes, royalties: st
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def getRoyalties(token: bytes) -> dict[str, int]:
+def getRoyalties(token: bytes) -> bytes:
     """
     Get a token royalties values.
 
@@ -522,8 +531,7 @@ def getRoyalties(token: bytes) -> dict[str, int]:
     :return: dictionnary of addresses and values for this token royalties.
     """
     ctx = get_context()
-    serialized = get_royalties(ctx, token)
-    return cast(dict[str, int], json_deserialize(serialized))
+    return get_royalties(ctx, token)
 
 @public
 def withdrawFee(account: UInt160) -> bool:
@@ -534,7 +542,7 @@ def withdrawFee(account: UInt160) -> bool:
     :type account: UInt160
     :return: whether the transaction was successful.
     :raise AssertionError: raised if witness is not owner
-    :emits MintFeesWithdrawn: on success emits MintFeesWithdrawn
+    :emits MintFeeWithdrawn: on success emits MintFeeWithdrawn
     """
     assert verify()
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash]))
@@ -563,20 +571,20 @@ def getMintFee() -> int:
     return fee
 
 @public
-def setMintFee(fee: int) -> int:
+def setMintFee(fee: int):
     """
     Set mint fees value.
 
     :param fee: fee to be used when minting
     :type fee: int
     :return: configured value of mint fees.
-    :raise AssertionError: raised if witness is not owner
-    :emits MintFeesUpdated: on success emits MintFeesUpdated
+    :raises AssertionError: raised if witness is not authorized
+    :emits MintFeeUpdated
     """
     assert verify()
     ctx = get_context()
-    on_mint_fees_updated(fee)
-    return set_mint_fee(ctx, fee)
+    set_mint_fee(ctx, fee)
+    on_update_mint_fee(fee)
 
 @public
 def getLockedContentViewCount(tokenId: bytes) -> int:
@@ -625,7 +633,7 @@ def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
     :return: whether the transaction signature is correct
     """
     if not verify():
-        return False
+        abort()
 
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
@@ -701,10 +709,11 @@ def verify() -> bool:
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
     for addr in auth: 
-        debug(["Verifying", addr])
         if check_witness(addr):
+            debug(["Verification successful", addr])
             return True
 
+    debug(["Verification failed", addr])
     return False
 
 @public
@@ -775,18 +784,18 @@ def internal_burn(token: bytes) -> bool:
     post_transfer(owner, None, token, None)
     return True
 
-def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: str, data: Any) -> bytes:
+def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token - internal
 
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: str
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
     :type lockedContent: bytes
     :param royalties: the royalties to use for this token
-    :type royalties: str
+    :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
@@ -796,8 +805,7 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: 
     nftData = 0
     token_id = get(TOKEN_COUNT, ctx).to_int() + 1
     put(TOKEN_COUNT, token_id, ctx)
-    tx = cast(Transaction, script_container)
-    nftData = nftData + tx.hash.to_int() + token_id
+    nftData = nftData + token_id
 
     if not isinstance(data, None):      # TODO: change to 'is not None' when `is` semantic is implemented
         nftData = nftData + serialize(data).to_int()
@@ -809,16 +817,15 @@ def internal_mint(account: UInt160, meta: str, lockedContent: bytes, royalties: 
     add_to_balance(ctx, account, 1)
     add_to_supply(ctx, 1)
 
-    nftmeta = json_serialize(meta)
-    add_meta(ctx, token, nftmeta)
-    debug(['nftmeta: ', nftmeta])
+    add_meta(ctx, token, meta)
+    debug(['metadata: ', meta])
 
     add_locked_content(ctx, token, lockedContent)
     debug(['locked: ', lockedContent])
 
-    royalties_bytes = json_serialize(royalties)
-    add_royalties(ctx, token, royalties_bytes)
-    on_royalties_set(token, royalties)
+    add_royalties(ctx, token, royalties)
+    # Unecessary event
+    # on_royalties_set(token, royalties)
     debug(['royalties: ', royalties])
 
     post_transfer(None, account, token, None)
@@ -896,10 +903,9 @@ def get_mint_fee(ctx: StorageContext) -> int:
         return 0
     return fee
 
-def set_mint_fee(ctx: StorageContext, amount: int) -> int:
+def set_mint_fee(ctx: StorageContext, amount: int):
     put(MINT_FEE, amount, ctx)
     debug(['set mint fee: ', amount])
-    return get_mint_fee(ctx)
 
 def get_locked_view_counter(ctx: StorageContext, token: bytes) -> int:
     key = mk_lv_key(token)

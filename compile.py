@@ -40,7 +40,21 @@ def cleanup(cleaned=False):
 
 def preprocess_contract(to_remove, path, path_cleaned):
     with open(path) as oldfile, open(path_cleaned, 'w') as newfile:
+        debug_block = False
         for line in oldfile:
+
+            if any(dbg_block in line for dbg_block in list(debug_block_start)):
+                print("found start")
+                debug_block = True
+
+            if any(dbg_block in line for dbg_block in list(debug_block_end)):
+                print("found end")
+                debug_block = False
+                continue
+
+            if debug_block:
+                continue
+
             if not any(to_remove in line for to_remove in to_remove):
                 newfile.write(line)
 
@@ -49,6 +63,8 @@ def build_contract(path):
 
 GHOST_ROOT = str(os.getcwd())
 to_remove = ['debug(']
+debug_block_start = ['#DEBUG_START']
+debug_block_end = ['#DEBUG_END']
 
 CONTRACT_DIR = GHOST_ROOT + '/contracts/NEP11/'
 CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
@@ -62,7 +78,7 @@ cleanup()
 preprocess_contract(to_remove, CONTRACT_PATH_PY, CONTRACT_PATH_PY_CLEANED)
 with suppress_stdout():
     build_contract(CONTRACT_PATH_PY_CLEANED)
-cleanup(True)
-fix_files()
+#cleanup(True)
+#fix_files()
 
 

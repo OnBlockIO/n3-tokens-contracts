@@ -9,7 +9,9 @@ from boa3.neo.vm.type.String import String
 from boa3.boa3 import Boa3
 from boa3.neo import to_script_hash, to_hex_str, from_hex_str
 from boa3.builtin.type import UInt160
+from boa3.builtin.interop.iterator import Iterator
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
+from boa3.neo.core.types.InteropInterface import InteropInterface
 
 
 class GhostTest(BoaTest):
@@ -24,14 +26,9 @@ class GhostTest(BoaTest):
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
-    TOKEN_META = {
-           "name": "GHOST",
-           "description": "A ghost shows up",
-           "image": "{some image URI}",
-           "tokenURI": "{some URI}"
-            }
-    LOCK_CONTENT = "lockedContent"
-    ROYALTIES = '[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]'
+    TOKEN_META = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
+    LOCK_CONTENT = bytes('lockedContent', 'utf-8')
+    ROYALTIES = bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8')
 
     def build_contract(self):
         print('contract path: ' + self.CONTRACT_PATH_PY)
@@ -202,7 +199,8 @@ class GhostTest(BoaTest):
         # should fail because account does not have enough for fees
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                # aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                aux_address, bytes(0), bytes(0), bytes(0), None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
@@ -217,15 +215,15 @@ class GhostTest(BoaTest):
                 expected_result_type=bytes)
 
         print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=dict)
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=bytes)
         print("props: " + str(properties))
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=dict)
+        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
         print("royalties: " + str(royalties))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
             properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties',
-                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=dict)
+                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=bytes)
         print("props: " + str(properties))
 
         # check balances after
@@ -262,26 +260,26 @@ class GhostTest(BoaTest):
 
         # define custom meta & lock & royalties for multi
         tokenMeta = [
-                '{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
-                '{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
-                '{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }'
+                bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
+                bytes('{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
+                bytes('{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
             ]
 
         lockedContent = [
-                '123',
-                '456',
-                '789',
+                bytes('123', 'utf-8'),
+                bytes('456', 'utf-8'),
+                bytes('789', 'utf-8'),
             ]
 
         royalties = [
-                '[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]',
-                '[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]',
-                '[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]',
+                bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8'),
+                bytes('[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]', 'utf-8'),
+                bytes('[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]', 'utf-8'),
             ]
 
         # check tokens iterator before
         ghost_tokens_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens')
-        print("tokens before: " + str(ghost_tokens_before))
+        self.assertEqual(InteropInterface, ghost_tokens_before)
 
         # multiMint
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
@@ -433,20 +431,21 @@ class GhostTest(BoaTest):
 
         # define custom meta & lock & royalties for multi
         tokenMeta = [
-                '{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
-                '{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }',
-                '{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }'
+                bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
+                bytes('{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
+                bytes('{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
             ]
+
         lockedContent = [
-                '123',
-                '456',
-                '789',
+                bytes('123', 'utf-8'),
+                bytes('456', 'utf-8'),
+                bytes('789', 'utf-8'),
             ]
 
         royalties = [
-                '[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]',
-                '[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]',
-                '[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]',
+                bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8'),
+                bytes('[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]', 'utf-8'),
+                bytes('[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]', 'utf-8'),
             ]
 
         # multiMint
@@ -547,11 +546,15 @@ class GhostTest(BoaTest):
         fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 1000,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
-        self.assertEqual(1000, fee)
 
-        # getMintFee should now be the new one
+        # getMintFee should retrurn the updated fee
+        fee_event = engine.get_events('MintFeeUpdated')
+        updated_fee = fee_event[0].arguments[0]
+        self.assertEqual(updated_fee, 1000)
+
+        # getMintFee should retrurn the updated fee
         fee2 = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
-        self.assertEqual(fee2, fee)
+        self.assertEqual(fee2, updated_fee)
 
         # fails because account not whitelisted
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
@@ -561,7 +564,7 @@ class GhostTest(BoaTest):
 
         # fees should be the same since it failed
         fee2 = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
-        self.assertEqual(fee2, fee)
+        self.assertEqual(fee2, updated_fee)
         self.print_notif(engine.notifications)
 
     def test_ghost_fee_balance(self):
