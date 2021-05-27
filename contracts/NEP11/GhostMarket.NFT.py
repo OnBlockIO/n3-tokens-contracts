@@ -60,7 +60,7 @@ PAUSED = b'paused'
 
 ACCOUNT_PREFIX = b'A'
 TOKEN_PREFIX = b'T'
-TOKEN_ID_PREFIX = b'TI'
+TOKEN_DATA_PREFIX = b'TD'
 LOCKED_PREFIX = b'LC'
 BALANCE_PREFIX = b'B'
 SUPPLY_PREFIX = b'S'
@@ -455,24 +455,22 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
 
     ctx = get_context()
     fee = get_mint_fee(ctx)
-    if fee < 0:
-        raise Exception("Mint fee can't be < 0")
 
-    if not check_witness(account):
-        raise Exception("tx not signed!")
+    assert fee > 0, "Mint fee can't be < 0"
+    assert check_witness(account), "tx not signed!" 
 
     if fee > 0:
         #debug(["before fee transfer", fee, UInt160(executing_script_hash), GAS])
         #current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
         #debug(["gas before", current_balance])
 
+        # TODO use calling_script_hash instead of account
         result = call_contract(GAS, 'transfer', [account, UInt160(executing_script_hash), fee, None])
 
         #debug(["after fee transfer", result])
         #current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
         #debug(["gas after", current_balance])
-        if not cast(bool, result):
-            raise Exception("Fee payment failed!")
+        assert cast(bool, result), "Fee payment failed!" 
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
@@ -496,12 +494,11 @@ def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], r
     """
     assert not isPaused(), "GhostMarket contract is currently paused"
 
-    if not isinstance(meta, list):
-        raise Exception("meta format should be a list!")
-    if not isinstance(lockedContent, list):
-        raise Exception("lock content format should be a list!")
-    if not isinstance(royalties, list):
-        raise Exception("royalties format should be a list!")
+    assert isinstance(meta, list), "meta format should be a list!"
+
+    assert isinstance(lockedContent, list), "lock content format should be a list!"
+
+    assert isinstance(royalties, list), "royalties format should be a list!"
 
     nfts: List[bytes] = []
     for i in range(0, len(meta)):
@@ -630,8 +627,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     ctx = get_context()
     owner = get_owner_of(ctx, tokenId)
 
-    if not check_witness(owner):
-        raise Exception("Prohibited access to locked content!")
+    assert check_witness(owner), "Prohibited access to locked content!"
     set_locked_view_counter(ctx, tokenId)
     
     debug(['getLockedContent: ', get_locked_content(ctx, tokenId)])
@@ -822,7 +818,6 @@ def internal_burn(tokenId: bytes) -> bool:
     if not check_witness(owner):
         return False
 
-    remove_token_id(ctx, tokenId, tokenId)
     remove_owner_of(ctx, tokenId)
     set_balance(ctx, owner, -1)
     add_to_supply(ctx, -1)
@@ -852,18 +847,15 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     """
     assert len(meta) != 0, '`meta` can not be empty'
     ctx = get_context()
-    newNFT = bytearray(TOKEN_SYMBOL_B)
 
     tokenId = get(TOKEN_COUNT, ctx).to_int() + 1
     put(TOKEN_COUNT, tokenId, ctx)
     tokenIdBytes = tokenId.to_bytes()
 
-    newNFT.append(tokenId)
+    
+    if not isinstance(data, None):
+        add_token_data(ctx, tokenIdBytes, serialize(data))
 
-    if not isinstance(data, None):      # TODO: change to 'is not None' when `is` semantic is implemented
-        newNFT.append(serialize(data).to_int()) 
-
-    add_token_id(ctx, tokenIdBytes, newNFT)
     set_owner_of(ctx, tokenIdBytes, account)
     set_balance(ctx, account, 1)
     add_to_supply(ctx, 1)
@@ -871,11 +863,11 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     add_meta(ctx, tokenIdBytes, meta)
     debug(['metadata: ', meta])
 
-    if len(lockedContent) != 0:
+    if not isinstance(lockedContent, None) or len(lockedContent) != 0:
         add_locked_content(ctx, tokenIdBytes, lockedContent)
         debug(['locked: ', lockedContent])
 
-    if len(royalties) != 0:
+    if not isinstance(royalties, None) or len(lockedContent) != 0:
         add_royalties(ctx, tokenIdBytes, royalties)
         debug(['royalties: ', royalties])
 
@@ -883,35 +875,31 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     on_mint(account, tokenId)
     return tokenIdBytes
 
-def get_token(ctx: StorageContext, owner: UInt160, token: bytes) -> bytes:
-    key = mk_account_key(owner) + token
+def get_token(ctx: StorageContext, owner: UInt160, tokenId: bytes) -> bytes:
+    key = mk_account_key(owner) + tokenId
     val = get(key, ctx)
     return val
 
-def remove_token(ctx: StorageContext, owner: UInt160, token: bytes):
-    key = mk_account_key(owner) + token
-    debug(['remove token: ', key, token])
-    delete(key, ctx)
-
-def add_token(ctx: StorageContext, owner: UInt160, token: bytes):
-    key = mk_account_key(owner) + token
-    debug(['add token: ', key, token])
-    put(key, token, ctx)
-
-def get_token_id(ctx: StorageContext, tokenId: bytes) -> bytes:
-    key = mk_token_id_key(tokenId) + tokenId
-    val = get(key, ctx)
-    return val
-
-def remove_token_id(ctx: StorageContext, tokenId: bytes, token: bytes):
-    key = mk_token_id_key(token) + tokenId
+def remove_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
+    key = mk_account_key(owner) + tokenId
     debug(['remove tokenId: ', key, tokenId])
     delete(key, ctx)
 
-def add_token_id(ctx: StorageContext, tokenId: bytes, token: bytes):
-    key = mk_token_id_key(token) + token
+def add_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
+    key = mk_account_key(owner) + tokenId
     debug(['add tokenId: ', key, tokenId])
     put(key, tokenId, ctx)
+
+def get_token_data(ctx: StorageContext, tokenId: bytes) -> Union[bytes, None]:
+    key = mk_token_data_key(tokenId)
+    debug(['get tokenId data: ', key, tokenId])
+    val = get(key, ctx)
+    return val
+
+def add_token_data(ctx: StorageContext, tokenId: bytes, data: bytes):
+    key = mk_token_data_key(tokenId)
+    debug(['add tokenId data: ', key, tokenId])
+    put(key, data, ctx)
 
 def get_owner_of(ctx: StorageContext, tokenId: bytes) -> UInt160:
     key = mk_token_key(tokenId)
@@ -980,18 +968,18 @@ def add_locked_content(ctx: StorageContext, tokenId: bytes, content: bytes):
 
 def get_royalties(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_royalties_key(tokenId)
-    debug(['get royalties for token: ', key, tokenId])
+    debug(['get royalties for tokenId: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def add_royalties(ctx: StorageContext, tokenId: bytes, royalties: bytes):
     key = mk_royalties_key(tokenId)
-    debug(['add royalties for token', key, tokenId])
+    debug(['add royalties for tokenId', key, tokenId])
     put(key, royalties, ctx)
 
 def remove_royalties(ctx: StorageContext, tokenId: bytes):
     key = mk_royalties_key(tokenId)
-    debug(['remove royalties for token: ', key, tokenId])
+    debug(['remove royalties for tokenId: ', key, tokenId])
     delete(key, ctx)
 
 def get_locked_view_counter(ctx: StorageContext, tokenId: bytes) -> int:
@@ -1024,11 +1012,11 @@ def mk_account_key(address: UInt160) -> bytes:
 def mk_balance_key(address: UInt160) -> bytes:
     return BALANCE_PREFIX + address
 
-def mk_token_key(token: bytes) -> bytes:
-    return TOKEN_PREFIX + token
+def mk_token_key(tokenId: bytes) -> bytes:
+    return TOKEN_PREFIX + tokenId
 
-def mk_token_id_key(token: bytes) -> bytes:
-    return TOKEN_ID_PREFIX + token
+def mk_token_data_key(tokenId: bytes) -> bytes:
+    return TOKEN_DATA_PREFIX + tokenId
 
 def mk_meta_key(tokenId: bytes) -> bytes:
     return META_PREFIX + tokenId
