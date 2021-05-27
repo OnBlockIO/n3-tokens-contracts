@@ -30,10 +30,17 @@ class GhostTest(BoaTest):
     LOCK_CONTENT = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8')
 
-    def build_contract(self):
+    def build_contract(self, preprocess=False):
         print('contract path: ' + self.CONTRACT_PATH_PY)
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
-        # print('address: ' + str(UInt160(hash160(output))))
+        if preprocess:
+            import os
+            old = os.getcwd()
+            os.chdir(self.GHOST_ROOT)
+            file = self.GHOST_ROOT + '/compile.py'
+            os.system(file)
+            os.chdir(old)
+        else:
+            output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
 
     def deploy_contract(self, engine):
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
@@ -42,8 +49,8 @@ class GhostTest(BoaTest):
                                          expected_result_type=bool)
         self.assertEqual(VoidType, result)
 
-    def prepare_testengine(self) -> TestEngine:
-        self.build_contract()
+    def prepare_testengine(self, preprocess=False) -> TestEngine:
+        self.build_contract(preprocess)
         root_folder = self.BOA_PATH
         engine = TestEngine(root_folder)
         engine.reset_engine()
@@ -284,7 +291,7 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_mint_cost(self):
-        engine = self.prepare_testengine()
+        engine = self.prepare_testengine(True)
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
@@ -414,7 +421,7 @@ class GhostTest(BoaTest):
             ]
 
         # check tokens iterator before
-        ghost_tokens_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens')
+        ghost_tokens_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens', expected_result_type=InteropInterface)
         self.assertEqual(InteropInterface, ghost_tokens_before)
 
         # multiMint
@@ -425,7 +432,7 @@ class GhostTest(BoaTest):
         print("result: " + str(result))
 
         # check tokens iterator after
-        ghost_tokens_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens')
+        ghost_tokens_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens', expected_result_type=InteropInterface)
         print("tokens after: " + str(ghost_tokens_after))
         
         # check balances after
@@ -762,7 +769,7 @@ class GhostTest(BoaTest):
         ghost_balance_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
         self.assertEqual(0, ghost_balance_after)
         owner_balance = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', self.OWNER_SCRIPT_HASH)
-        self.assertEqual(10000000 + 200000, owner_balance)
+        self.assertEqual(1000000 + 200000, owner_balance)
         self.print_notif(engine.notifications)
 
         

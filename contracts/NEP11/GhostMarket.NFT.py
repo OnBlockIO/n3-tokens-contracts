@@ -225,8 +225,9 @@ def tokensOf(owner: UInt160) -> Iterator:
     """
     assert len(owner) == 20, "Incorrect `owner` length"
     ctx = get_context()
-    debug(['tokensOf: ', find(mk_account_key(owner), ctx)])
-    return find(mk_account_key(owner), ctx)
+    iterator = find(mk_account_key(owner), ctx)
+    debug(['tokensOf: ', iterator])
+    return iterator
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
@@ -319,11 +320,12 @@ def tokens() -> Iterator:
     :return: an iterator that contains all of the tokens minted by the contract.
     """
     ctx = get_context()
-    debug(['tokens: ', find(TOKEN_PREFIX, ctx)])
-    return find(TOKEN_PREFIX, ctx)
+    iterator = find(TOKEN_PREFIX, ctx)
+    debug(['tokens: ', iterator])
+    return iterator
 
 @public
-def properties(tokenId: bytes) -> bytes:
+def properties(tokenId: bytes) -> str:
     """
     Get the properties of a token.
 
@@ -338,7 +340,7 @@ def properties(tokenId: bytes) -> bytes:
     meta = get_meta(ctx, tokenId)
     assert len(meta) != 0, 'No metadata available for token'
     debug(['properties: ', meta])
-    return meta
+    return cast(str, json_deserialize(meta))
 
 @public
 def _deploy(data: Any, upgrade: bool):
@@ -428,13 +430,15 @@ def multiBurn(tokens: List[bytes]) -> List[bool]:
     :type tokens: ByteString list
     :return: whether each burn was successful, as a list.
     """
+    assert not isPaused(), "GhostMarket contract is currently paused"
+
     burned: List[bool] = []
     for i in tokens:
         burned.append(burn(i))
     return burned
 
 @public
-def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> int:
+def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token.
 
@@ -451,6 +455,8 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     :return: tokenId of the token minted
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
     """
+    assert not isPaused(), "GhostMarket contract is currently paused"
+
     ctx = get_context()
     fee = get_mint_fee(ctx)
     if fee < 0:
@@ -475,7 +481,7 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], royalties: List[bytes], data: Any) -> List[int]:
+def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], royalties: List[bytes], data: Any) -> List[bytes]:
     """
     Mint new tokens.
 
@@ -492,6 +498,8 @@ def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], r
     :return: list of tokenId of the tokens minted
     :raise AssertionError: raised if royalties or lockContent or meta is not a list
     """
+    assert not isPaused(), "GhostMarket contract is currently paused"
+
     if not isinstance(meta, list):
         raise Exception("meta format should be a list!")
     if not isinstance(lockedContent, list):
@@ -499,13 +507,13 @@ def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], r
     if not isinstance(royalties, list):
         raise Exception("royalties format should be a list!")
 
-    nfts: List[int] = []
+    nfts: List[bytes] = []
     for i in range(0, len(meta)):
         nfts.append(mint(account, meta[i], lockedContent[i], royalties[i], data))
     return nfts
 
 @public
-def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> int:
+def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token with no fees - whitelisted only.
 
@@ -522,13 +530,14 @@ def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: 
     :return: tokenId of the token minted
     :raise AssertionError: raised if address is not whitelisted
     """
+    assert not isPaused(), "GhostMarket contract is currently paused"
     assert isWhitelisted(), '`account` is not whitelisted for mintWithURI'
 
     # TODO what about royalties handling with mintWithURI()
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def getRoyalties(tokenId: bytes) -> bytes:
+def getRoyalties(tokenId: bytes) -> str:
     """
     Get a token royalties values.
 
@@ -538,8 +547,9 @@ def getRoyalties(tokenId: bytes) -> bytes:
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     ctx = get_context()
-    debug(['get_royalties: ', get_royalties(ctx, tokenId)])
-    return get_royalties(ctx, tokenId)
+    royalties = get_royalties(ctx, tokenId)
+    debug(['get_royalties: ', royalties])
+    return cast(str, json_deserialize(royalties))
 
 @public
 def withdrawFee(account: UInt160) -> bool:
@@ -632,7 +642,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     return get_locked_content(ctx, tokenId)
 
 @public
-def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
+def setAuthorizedAddress(address: UInt160, authorized: bool):
     """
     Configure authorizated addresses.
 
@@ -668,10 +678,8 @@ def setAuthorizedAddress(address: UInt160, authorized: bool) -> bool:
         put(AUTH_ADDRESSES, serialize(auth))
         on_auth(address, 0, False)
 
-    return True
-
 @public
-def setWhitelistedAddress(address: UInt160, authorized: bool) -> bool:
+def setWhitelistedAddress(address: UInt160, authorized: bool):
     """
     Configure whitelisted addresses.
 
@@ -706,8 +714,6 @@ def setWhitelistedAddress(address: UInt160, authorized: bool) -> bool:
         auth.remove(address)
         put(WL_ADDRESSES, serialize(auth))
         on_auth(address, 1, False)
-
-    return True
 
 @public
 def updatePause(status: bool) -> bool:
@@ -823,7 +829,7 @@ def internal_burn(tokenId: bytes) -> bool:
     remove_token_id(ctx, tokenId, tokenId)
     remove_owner_of(ctx, tokenId)
     set_balance(ctx, owner, -1)
-    set_supply(-1)
+    add_to_supply(ctx, -1)
     remove_meta(ctx, tokenId)
     remove_locked_content(ctx, tokenId)
     remove_royalties(ctx, tokenId)
@@ -831,7 +837,7 @@ def internal_burn(tokenId: bytes) -> bool:
     post_transfer(owner, None, tokenId, None)
     return True
 
-def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> int:
+def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token - internal
 
@@ -849,38 +855,37 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     :raise AssertionError: raised if meta is empty, or if contract is paused.
     """
     assert len(meta) != 0, '`meta` can not be empty'
-    assert not isPaused(), "GhostMarket contract is currently paused"
     ctx = get_context()
     newNFT = bytearray(TOKEN_SYMBOL_B)
 
     tokenId = get(TOKEN_COUNT, ctx).to_int() + 1
     put(TOKEN_COUNT, tokenId, ctx)
+    tokenIdBytes = tokenId.to_bytes()
 
     newNFT.append(tokenId)
 
     if not isinstance(data, None):      # TODO: change to 'is not None' when `is` semantic is implemented
         newNFT.append(serialize(data).to_int()) 
 
-    token = newNFT
-    add_token_id(ctx, tokenId.to_bytes(), token)
-    set_owner_of(ctx, tokenId.to_bytes(), account)
+    add_token_id(ctx, tokenIdBytes, newNFT)
+    set_owner_of(ctx, tokenIdBytes, account)
     set_balance(ctx, account, 1)
-    set_supply(1)
+    add_to_supply(ctx, 1)
 
-    add_meta(ctx, tokenId.to_bytes(), meta)
+    add_meta(ctx, tokenIdBytes, meta)
     debug(['metadata: ', meta])
 
     if len(lockedContent) != 0:
-        add_locked_content(ctx, tokenId.to_bytes(), lockedContent)
+        add_locked_content(ctx, tokenIdBytes, lockedContent)
         debug(['locked: ', lockedContent])
 
     if len(royalties) != 0:
-        add_royalties(ctx, tokenId.to_bytes(), royalties)
+        add_royalties(ctx, tokenIdBytes, royalties)
         debug(['royalties: ', royalties])
 
-    post_transfer(None, account, tokenId.to_bytes(), None)
+    post_transfer(None, account, tokenIdBytes, None)
     on_mint(account, tokenId)
-    return tokenId
+    return tokenIdBytes
 
 def get_token(ctx: StorageContext, owner: UInt160, token: bytes) -> bytes:
     key = mk_account_key(owner) + token
@@ -931,10 +936,10 @@ def set_mint_fee(ctx: StorageContext, amount: int):
     debug(['set mint fee: ', amount])
     put(MINT_FEE, amount, ctx)
 
-def set_supply(amount: int):
+def add_to_supply(ctx: StorageContext, amount: int):
     total = totalSupply() + (amount)
     debug(['add to supply: ', amount])
-    put(SUPPLY_PREFIX, total)
+    put(SUPPLY_PREFIX, total, ctx)
 
 def set_balance(ctx: StorageContext, owner: UInt160, amount: int):
     old = balanceOf(owner)

@@ -78,7 +78,7 @@ cleanup()
 preprocess_contract(to_remove, CONTRACT_PATH_PY, CONTRACT_PATH_PY_CLEANED)
 with suppress_stdout():
     build_contract(CONTRACT_PATH_PY_CLEANED)
-#cleanup(True)
-#fix_files()
+cleanup(True)
+fix_files()
 
 
