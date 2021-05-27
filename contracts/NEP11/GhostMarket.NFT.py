@@ -38,11 +38,10 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 
 # Fee on deploy
-MINT_FEE_ON_DEPLOY = 1000000
+MINT_FEE_ON_DEPLOY = 0.05 * 10 ** 8 # initial mint fees of 0.05 GAS
 
 # Symbol of the Token
 TOKEN_SYMBOL = 'GHOST'
-TOKEN_SYMBOL_B = b'GHOST'
 
 # Number of decimal places
 TOKEN_DECIMALS = 0
@@ -84,7 +83,7 @@ WL_ADDRESSES = b'W'
 # -------------------------------------------
 
 on_transfer = CreateNewEvent(
-    #trigger when tokens are transferred, including zero value transfers.
+    # trigger when tokens are transferred, including zero value transfers.
     [
         ('from_addr', Union[UInt160, None]),
         ('to_addr', Union[UInt160, None]),
@@ -95,7 +94,7 @@ on_transfer = CreateNewEvent(
 )
 
 on_auth = CreateNewEvent(
-    #trigger when an address has been authorized/whitelisted.
+    # trigger when an address has been authorized/whitelisted.
     [
         ('authorized', UInt160),
         ('type', int),
@@ -105,7 +104,7 @@ on_auth = CreateNewEvent(
 )
 
 on_mint = CreateNewEvent(
-    #trigger when a token has been minted.
+    # trigger when a token has been minted.
     [
         ('creator', UInt160),
         ('tokenId', int)
@@ -114,7 +113,7 @@ on_mint = CreateNewEvent(
 )
 
 on_withdraw_mint_fee = CreateNewEvent(
-    #trigger when mint fees are withdrawn.
+    # trigger when mint fees are withdrawn.
     [
         ('from_addr', UInt160),
         ('value', int)
@@ -249,10 +248,8 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     :type tokenId: ByteString
     :param data: whatever data is pertinent to the onPayment method
     :type data: Any
-
     :return: whether the transfer was successful
-    :raise AssertionError: raised if `to` length is not 20 or if `tokenId` is not a valid NFT.
-    :emits Transfer: on success emits Transfer
+    :raise AssertionError: raised if `to` length is not 20 or if `tokenId` is not a valid NFT or if the contract is paused.
     """
     assert len(to) == 20, "Incorrect `to` length"
     assert not isPaused(), "GhostMarket contract is currently paused"
@@ -292,7 +289,6 @@ def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], t
             call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
             pass
 
-
 @public
 def ownerOf(tokenId: bytes) -> UInt160:
     """
@@ -318,6 +314,7 @@ def tokens() -> Iterator:
     :return: an iterator that contains all of the tokens minted by the contract.
     """
     ctx = get_context()
+    debug(['tokens: ', find(TOKEN_PREFIX, ctx)])
     return find(TOKEN_PREFIX, ctx)
 
 @public
@@ -330,7 +327,7 @@ def properties(tokenId: bytes) -> str:
     :param tokenId: the token for which to check the properties
     :type tokenId: ByteString
     :return: a serialized NVM object containing the properties for the given NFT.
-    :raise AssertionError: raised if `tokenId` is not a valid NFT, or if not metadata available.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     ctx = get_context()
     meta = get_meta(ctx, tokenId)
@@ -342,8 +339,6 @@ def properties(tokenId: bytes) -> str:
 def _deploy(data: Any, upgrade: bool):
     """
     The contracts initial entry point, on deployment.
-
-    : 
     """
     if upgrade:
         return
@@ -402,6 +397,7 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     if calling_script_hash != GAS:
         abort()
 
+
 # -------------------------------------------
 # GhostMarket Methods
 # -------------------------------------------
@@ -414,7 +410,9 @@ def burn(tokenId: bytes) -> bool:
     :param tokenId: the token to burn
     :type tokenId: ByteString
     :return: whether the burn was successful.
+    :raise AssertionError: raised if the contract is paused.
     """
+    assert not isPaused(), "GhostMarket contract is currently paused"
     return internal_burn(tokenId)
 
 @public
@@ -426,8 +424,6 @@ def multiBurn(tokens: List[bytes]) -> List[bool]:
     :type tokens: ByteString list
     :return: whether each burn was successful, as a list.
     """
-    assert not isPaused(), "GhostMarket contract is currently paused"
-
     burned: List[bool] = []
     for i in tokens:
         burned.append(burn(i))
@@ -449,28 +445,19 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :return: tokenId of the token minted
-    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it
+    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it or if the contract is paused or if check witness fails.
     """
     assert not isPaused(), "GhostMarket contract is currently paused"
 
     ctx = get_context()
     fee = get_mint_fee(ctx)
-
     assert fee > 0, "Mint fee can't be < 0"
-    assert check_witness(account), "tx not signed!" 
+    assert check_witness(account), "Invalid witness" 
 
     if fee > 0:
-        #debug(["before fee transfer", fee, UInt160(executing_script_hash), GAS])
-        #current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
-        #debug(["gas before", current_balance])
-
         # TODO use calling_script_hash instead of account
-        result = call_contract(GAS, 'transfer', [account, UInt160(executing_script_hash), fee, None])
-
-        #debug(["after fee transfer", result])
-        #current_balance = cast(int, call_contract(GAS, 'balanceOf', [account]))
-        #debug(["gas after", current_balance])
-        assert cast(bool, result), "Fee payment failed!" 
+        success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
+        assert success, "Fee payment failed!" 
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
@@ -492,12 +479,8 @@ def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], r
     :return: list of tokenId of the tokens minted
     :raise AssertionError: raised if royalties or lockContent or meta is not a list
     """
-    assert not isPaused(), "GhostMarket contract is currently paused"
-
     assert isinstance(meta, list), "meta format should be a list!"
-
     assert isinstance(lockedContent, list), "lock content format should be a list!"
-
     assert isinstance(royalties, list), "royalties format should be a list!"
 
     nfts: List[bytes] = []
@@ -521,7 +504,7 @@ def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: 
     :param data: whatever data is pertinent to the mint method
     :type data: Any
     :return: tokenId of the token minted
-    :raise AssertionError: raised if address is not whitelisted
+    :raise AssertionError: raised if address is not whitelisted or if contract is paused
     """
     assert not isPaused(), "GhostMarket contract is currently paused"
     assert isWhitelisted(), '`account` is not whitelisted for mintWithURI'
@@ -553,14 +536,15 @@ def withdrawFee(account: UInt160) -> bool:
     :type account: UInt160
     :return: whether the transaction was successful.
     :emits MintFeeWithdrawn: on success emits MintFeeWithdrawn
-    :raise AssertionError: raised if witness is not verified, or if contract is paused.
+    :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for withdrawFee'
-    assert not isPaused(), "GhostMarket contract is currently paused"
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash]))
     on_withdraw_mint_fee(account, current_balance)
     debug(['withdrawFee: ', current_balance])
-    return cast(bool, call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None]))
+
+    transfer: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
+    return transfer
 
 @public
 def getFeeBalance() -> Any:
@@ -592,11 +576,10 @@ def setMintFee(fee: int):
 
     :param fee: fee to be used when minting
     :type fee: int
-    :raise AssertionError: raised if witness is not verified, or if contract is paused.
+    :raise AssertionError: raised if witness is not verified.
     :emits MintFeeUpdated
     """
     assert verify(), '`acccount` is not allowed for setMintFee'
-    assert not isPaused(), "GhostMarket contract is currently paused"
     ctx = get_context()
     set_mint_fee(ctx, fee)
     on_update_mint_fee(fee)
@@ -636,7 +619,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
 @public
 def setAuthorizedAddress(address: UInt160, authorized: bool):
     """
-    Configure authorizated addresses.
+    Configure authorized addresses.
 
     When this contract address is included in the transaction signature,
     this method will be triggered as a VerificationTrigger to verify that the signature is correct.
@@ -647,10 +630,9 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :param authorized: authorization status of this address
     :type authorized: bool
     :return: whether the transaction signature is correct
-    :raise AssertionError: raised if witness is not verified, or if contract is paused.
+    :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
-    assert not isPaused(), "GhostMarket contract is currently paused"
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -684,10 +666,9 @@ def setWhitelistedAddress(address: UInt160, authorized: bool):
     :param authorized: authorization status of this address
     :type authorized: bool
     :return: whether the transaction signature is correct
-    :raise AssertionError: raised if witness is not verified, or if contract is paused.
+    :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for setWhitelistedAddress'
-    assert not isPaused(), "GhostMarket contract is currently paused"
     serialized = get(WL_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -809,9 +790,8 @@ def internal_burn(tokenId: bytes) -> bool:
     :param tokenId: the token to burn
     :type tokenId: ByteString
     :return: whether the burn was successful.
-    :raise AssertionError: raised if `tokenId` is not a valid NFT, or if contract is paused.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
-    assert not isPaused(), "GhostMarket contract is currently paused"
     ctx = get_context()
     owner = get_owner_of(ctx, tokenId)
 
@@ -851,7 +831,6 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     tokenId = get(TOKEN_COUNT, ctx).to_int() + 1
     put(TOKEN_COUNT, tokenId, ctx)
     tokenIdBytes = tokenId.to_bytes()
-
     
     if not isinstance(data, None):
         add_token_data(ctx, tokenIdBytes, serialize(data))
@@ -867,7 +846,7 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
         add_locked_content(ctx, tokenIdBytes, lockedContent)
         debug(['locked: ', lockedContent])
 
-    if not isinstance(royalties, None) or len(lockedContent) != 0:
+    if not isinstance(royalties, None) or len(royalties) != 0:
         add_royalties(ctx, tokenIdBytes, royalties)
         debug(['royalties: ', royalties])
 
@@ -877,58 +856,60 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
 
 def get_token(ctx: StorageContext, owner: UInt160, tokenId: bytes) -> bytes:
     key = mk_account_key(owner) + tokenId
+    debug(['get_token: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def remove_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
     key = mk_account_key(owner) + tokenId
-    debug(['remove tokenId: ', key, tokenId])
+    debug(['remove_token: ', key, tokenId])
     delete(key, ctx)
 
 def add_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
     key = mk_account_key(owner) + tokenId
-    debug(['add tokenId: ', key, tokenId])
+    debug(['add_token: ', key, tokenId])
     put(key, tokenId, ctx)
 
 def get_token_data(ctx: StorageContext, tokenId: bytes) -> Union[bytes, None]:
     key = mk_token_data_key(tokenId)
-    debug(['get tokenId data: ', key, tokenId])
+    debug(['get_token_data: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def add_token_data(ctx: StorageContext, tokenId: bytes, data: bytes):
     key = mk_token_data_key(tokenId)
-    debug(['add tokenId data: ', key, tokenId])
+    debug(['add_token_data: ', key, tokenId])
     put(key, data, ctx)
 
 def get_owner_of(ctx: StorageContext, tokenId: bytes) -> UInt160:
     key = mk_token_key(tokenId)
+    debug(['get_owner_of: ', key, tokenId])
     owner = get(key, ctx)
     return UInt160(owner)
 
 def remove_owner_of(ctx: StorageContext, tokenId: bytes):
     key = mk_token_key(tokenId)
-    debug(['remove owner of: ', key, tokenId])
+    debug(['remove_owner_of: ', key, tokenId])
     delete(key, ctx)
 
 def set_owner_of(ctx: StorageContext, tokenId: bytes, owner: UInt160):
     key = mk_token_key(tokenId)
-    debug(['set owner of: ', key, tokenId])
+    debug(['set_owner_of: ', key, tokenId])
     put(key, owner, ctx)
 
 def set_mint_fee(ctx: StorageContext, amount: int):
-    debug(['set mint fee: ', amount])
+    debug(['set_mint_fee: ', amount])
     put(MINT_FEE, amount, ctx)
 
 def add_to_supply(ctx: StorageContext, amount: int):
     total = totalSupply() + (amount)
-    debug(['add to supply: ', amount])
+    debug(['add_to_supply: ', amount])
     put(SUPPLY_PREFIX, total, ctx)
 
 def set_balance(ctx: StorageContext, owner: UInt160, amount: int):
     old = balanceOf(owner)
     new = old + (amount)
-    debug(['add to balance: ', amount])
+    debug(['set_balance: ', amount])
 
     key = mk_balance_key(owner)
     if (new > 0):
@@ -938,68 +919,71 @@ def set_balance(ctx: StorageContext, owner: UInt160, amount: int):
 
 def get_meta(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_meta_key(tokenId)
+    debug(['get_meta: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def remove_meta(ctx: StorageContext, tokenId: bytes):
     key = mk_meta_key(tokenId)
-    debug(['remove meta: ', key, tokenId])
+    debug(['remove_meta: ', key, tokenId])
     delete(key, ctx)
 
 def add_meta(ctx: StorageContext, tokenId: bytes, meta: bytes):
     key = mk_meta_key(tokenId)
-    debug(['add meta: ', key, tokenId])
+    debug(['add_meta: ', key, tokenId])
     put(key, meta, ctx)
 
 def get_locked_content(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_locked_key(tokenId)
+    debug(['get_locked_content: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def remove_locked_content(ctx: StorageContext, tokenId: bytes):
     key = mk_locked_key(tokenId)
-    debug(['remove locked content: ', key, tokenId])
+    debug(['remove_locked_content: ', key, tokenId])
     delete(key, ctx)
 
 def add_locked_content(ctx: StorageContext, tokenId: bytes, content: bytes):
     key = mk_locked_key(tokenId)
-    debug(['add locked content: ', key, tokenId])
+    debug(['add_locked_content: ', key, tokenId])
     put(key, content, ctx)
 
 def get_royalties(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_royalties_key(tokenId)
-    debug(['get royalties for tokenId: ', key, tokenId])
+    debug(['get_royalties: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def add_royalties(ctx: StorageContext, tokenId: bytes, royalties: bytes):
     key = mk_royalties_key(tokenId)
-    debug(['add royalties for tokenId', key, tokenId])
+    debug(['add_royalties: ', key, tokenId])
     put(key, royalties, ctx)
 
 def remove_royalties(ctx: StorageContext, tokenId: bytes):
     key = mk_royalties_key(tokenId)
-    debug(['remove royalties for tokenId: ', key, tokenId])
+    debug(['remove_royalties: ', key, tokenId])
     delete(key, ctx)
 
 def get_locked_view_counter(ctx: StorageContext, tokenId: bytes) -> int:
     key = mk_lv_key(tokenId)
-    debug(['get locked view counter: ', key, tokenId])
+    debug(['get_locked_view_counter: ', key, tokenId])
     return get(key, ctx).to_int()
 
 def remove_locked_view_counter(ctx: StorageContext, tokenId: bytes):
     key = mk_lv_key(tokenId)
-    debug(['remove locked view counter: ', key, tokenId])
+    debug(['remove_locked_view_counter: ', key, tokenId])
     delete(key, ctx)
 
 def set_locked_view_counter(ctx: StorageContext, tokenId: bytes):
     key = mk_lv_key(tokenId)
+    debug(['set_locked_view_counter: ', key, tokenId])
     count = get(key, ctx).to_int() + 1
-    debug(['incr locked view counter: ', key, tokenId])
     put(key, count)
 
 def get_mint_fee(ctx: StorageContext) -> int:
     fee = get(MINT_FEE, ctx).to_int()
+    debug(['get_mint_fee: ', fee])
     if fee is None:
         return 0
     return fee
