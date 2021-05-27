@@ -38,7 +38,7 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 
 # Fee on deploy
-MINT_FEE_ON_DEPLOY = 0.05 * 10 ** 8 # initial mint fees of 0.05 GAS
+MINT_FEE_ON_DEPLOY = 500000 # initial mint fees of 0.05 GAS
 
 # Symbol of the Token
 TOKEN_SYMBOL = 'GHOST'
@@ -543,8 +543,8 @@ def withdrawFee(account: UInt160) -> bool:
     on_withdraw_mint_fee(account, current_balance)
     debug(['withdrawFee: ', current_balance])
 
-    transfer: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
-    return transfer
+    status: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
+    return status
 
 @public
 def getFeeBalance() -> Any:
