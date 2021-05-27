@@ -290,8 +290,8 @@ class GhostTest(BoaTest):
         self.assertEqual(1, ghost_supply_after)
         self.print_notif(engine.notifications)
 
-    def test_ghost_mint_cost(self):
-        engine = self.prepare_testengine(True)
+    def test_ghost_gas_cost(self):
+        engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
@@ -769,7 +769,7 @@ class GhostTest(BoaTest):
         ghost_balance_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
         self.assertEqual(0, ghost_balance_after)
         owner_balance = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', self.OWNER_SCRIPT_HASH)
-        self.assertEqual(1000000 + 200000, owner_balance)
+        self.assertEqual(500000 + 200000, owner_balance)
         self.print_notif(engine.notifications)
 
         
