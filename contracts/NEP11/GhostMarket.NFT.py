@@ -225,9 +225,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     """
     assert len(owner) == 20, "Incorrect `owner` length"
     ctx = get_context()
-    iterator = find(mk_account_key(owner), ctx)
-    debug(['tokensOf: ', iterator])
-    return iterator
+    return find(mk_account_key(owner), ctx)
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
@@ -320,9 +318,7 @@ def tokens() -> Iterator:
     :return: an iterator that contains all of the tokens minted by the contract.
     """
     ctx = get_context()
-    iterator = find(TOKEN_PREFIX, ctx)
-    debug(['tokens: ', iterator])
-    return iterator
+    return find(TOKEN_PREFIX, ctx)
 
 @public
 def properties(tokenId: bytes) -> str:
