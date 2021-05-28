@@ -739,10 +739,10 @@ class GhostTest(BoaTest):
         balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
-        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
+        initial_fee  = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
 
         # should have new balance
-        self.assertEqual(fee, balance_after)
+        self.assertEqual(initial_fee, balance_after)
 
         # set mint fee to 200000 + mint + getFeeBalance
         fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 200000,
@@ -769,7 +769,7 @@ class GhostTest(BoaTest):
         ghost_balance_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
         self.assertEqual(0, ghost_balance_after)
         owner_balance = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', self.OWNER_SCRIPT_HASH)
-        self.assertEqual(500000 + 200000, owner_balance)
+        self.assertEqual(initial_fee + 200000, owner_balance)
         self.print_notif(engine.notifications)
 
         

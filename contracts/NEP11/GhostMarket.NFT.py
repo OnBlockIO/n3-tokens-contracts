@@ -245,11 +245,11 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
 
     if (token_owner != to):
         set_balance(ctx, token_owner, -1)
-        remove_token(ctx, token_owner, tokenId)
 
         set_balance(ctx, to, 1)
-        add_token(ctx, to, tokenId)
+
         set_owner_of(ctx, tokenId, to)
+
     post_transfer(token_owner, to, tokenId, data)
     return True
 
@@ -372,6 +372,7 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     """
     if calling_script_hash != GAS:
         abort()
+    debug(["onNEP17Payment", data])
 
 
 # -------------------------------------------
@@ -812,19 +813,6 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     post_transfer(None, account, tokenIdBytes, None)
     on_mint(account, tokenId)
     return tokenIdBytes
-
-def get_token(ctx: StorageContext, owner: UInt160, tokenId: bytes) -> bytes:
-    key = mk_account_key(owner) + tokenId
-    val = get(key, ctx)
-    return val
-
-def remove_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
-    key = mk_account_key(owner) + tokenId
-    delete(key, ctx)
-
-def add_token(ctx: StorageContext, owner: UInt160, tokenId: bytes):
-    key = mk_account_key(owner) + tokenId
-    put(key, tokenId, ctx)
 
 def get_token_data(ctx: StorageContext, tokenId: bytes) -> Union[bytes, None]:
     key = mk_token_data_key(tokenId)
