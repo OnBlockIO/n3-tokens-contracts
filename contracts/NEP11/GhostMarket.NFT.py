@@ -29,7 +29,8 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Mathias Enzensberger, Vincent Geneste"
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
-    meta.supportedstandards = "NEP-11" # TODO: NOT SUPPORTED YET
+    # meta.supportedstandards = "NEP-11" # TODO: NOT SUPPORTED YET
+    # meta.permissions = [{"contract": "*","methods": "*"}] # TODO: NOT SUPPORTED YET
     return meta
 
 
@@ -249,7 +250,6 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
         set_balance(ctx, to, 1)
 
         set_owner_of(ctx, tokenId, to)
-
     post_transfer(token_owner, to, tokenId, data)
     return True
 
@@ -372,7 +372,6 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     """
     if calling_script_hash != GAS:
         abort()
-    debug(["onNEP17Payment", data])
 
 
 # -------------------------------------------
@@ -431,10 +430,10 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     assert fee > 0, "Mint fee can't be < 0"
     assert check_witness(account), "Invalid witness" 
 
-    if fee > 0:
+    #if fee > 0:
         # TODO use calling_script_hash instead of account
-        success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        assert success, "Fee payment failed!" 
+        #success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
+        #assert success, "Fee payment failed!" 
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
