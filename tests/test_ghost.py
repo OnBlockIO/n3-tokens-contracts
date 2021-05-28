@@ -19,9 +19,9 @@ class GhostTest(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.debug.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.debug.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.debug.py'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
