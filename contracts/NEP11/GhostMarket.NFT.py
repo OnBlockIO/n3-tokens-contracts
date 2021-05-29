@@ -139,6 +139,18 @@ on_deploy = CreateNewEvent(
     'Deploy'
 )
 
+#DEBUG_START
+# -------------------------------------------
+# DEBUG
+# -------------------------------------------
+
+debug = CreateNewEvent(
+    [
+        ('params', list),
+    ],
+    'Debug'
+)
+#DEBUG_END
 # -------------------------------------------
 # NEP-11 Methods
 # -------------------------------------------
@@ -154,6 +166,7 @@ def symbol() -> str:
 
     :return: a short string representing symbol of the token managed in this contract.
     """
+    debug(['symbol: ', TOKEN_SYMBOL])
     return TOKEN_SYMBOL
 
 @public
@@ -166,6 +179,7 @@ def decimals() -> int:
 
     :return: the number of decimals used by the token.
     """
+    debug(['decimals: ', TOKEN_DECIMALS])
     return TOKEN_DECIMALS
 
 @public
@@ -178,6 +192,7 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
+    debug(['totalSupply: ', get(SUPPLY_PREFIX).to_int()])
     return get(SUPPLY_PREFIX).to_int()
 
 @public
@@ -193,6 +208,7 @@ def balanceOf(owner: UInt160) -> int:
     :raise AssertionError: raised if `owner` length is not 20.
     """
     assert len(owner) == 20, "Incorrect `owner` length"
+    debug(['balanceOf: ', get(mk_balance_key(owner)).to_int()])
     return get(mk_balance_key(owner)).to_int()
 
 @public
@@ -287,6 +303,7 @@ def ownerOf(tokenId: bytes) -> UInt160:
     """
     ctx = get_context()
     owner = get_owner_of(ctx, tokenId)
+    debug(['ownerOf: ', owner])
     return owner
 
 @public
@@ -297,6 +314,7 @@ def tokens() -> Iterator:
     :return: an iterator that contains all of the tokens minted by the contract.
     """
     ctx = get_context()
+    debug(['tokens: ', find(TOKEN_PREFIX, ctx)])
     return find(TOKEN_PREFIX, ctx)
 
 @public
@@ -314,6 +332,7 @@ def properties(tokenId: bytes) -> str:
     ctx = get_context()
     meta = get_meta(ctx, tokenId)
     assert len(meta) != 0, 'No metadata available for token'
+    debug(['properties: ', meta])
     return cast(str, json_deserialize(meta))
 
 @public
@@ -328,6 +347,11 @@ def _deploy(data: Any, upgrade: bool):
         abort()
 
     tx = cast(Transaction, script_container)
+#DEBUG_START
+#custom owner for tests
+    if tx.sender is None:
+        owner = UInt160(b'\x96Wl\x0e**\x1c!\xc4\xac^\xbd)31\x15%A\x1f@')
+#DEBUG_END
 
     put(DEPLOYED, True)
     put(PAUSED, False)
@@ -372,6 +396,7 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     """
     if calling_script_hash != GAS:
         abort()
+    debug(["onNEP17Payment", data])
 
 
 # -------------------------------------------
@@ -500,6 +525,7 @@ def getRoyalties(tokenId: bytes) -> str:
     """
     ctx = get_context()
     royalties = get_royalties(ctx, tokenId)
+    debug(['get_royalties: ', royalties])
     return cast(str, json_deserialize(royalties))
 
 @public
@@ -516,6 +542,7 @@ def withdrawFee(account: UInt160) -> bool:
     assert verify(), '`acccount` is not allowed for withdrawFee'
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash]))
     on_withdraw_mint_fee(account, current_balance)
+    debug(['withdrawFee: ', current_balance])
 
     status: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
     return status
@@ -528,6 +555,7 @@ def getFeeBalance() -> Any:
     :return: balance of mint fees.
     """
     balance = call_contract(GAS, 'balanceOf', [executing_script_hash])
+    debug(['getFeeBalance: ', balance])
     return balance
 
 @public
@@ -539,6 +567,7 @@ def getMintFee() -> int:
     """
     ctx = get_context()
     fee = get_mint_fee(ctx)
+    debug(['getMintFee: ', fee])
     return fee
 
 @public
@@ -566,6 +595,7 @@ def getLockedContentViewCount(tokenId: bytes) -> int:
     :return: number of times the lock content of this token was accessed.
     """
     ctx = get_context()
+    debug(['getLockedContentViewCount: ', get_locked_view_counter(ctx, tokenId)])
     return get_locked_view_counter(ctx, tokenId)
 
 @public
@@ -584,6 +614,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     assert check_witness(owner), "Prohibited access to locked content!"
     set_locked_view_counter(ctx, tokenId)
     
+    debug(['getLockedContent: ', get_locked_content(ctx, tokenId)])
     return get_locked_content(ctx, tokenId)
 
 @public
@@ -670,6 +701,7 @@ def updatePause(status: bool) -> bool:
     """
     assert verify(), '`acccount` is not allowed for updatePause'
     put(PAUSED, status)
+    debug(['updatePause: ', get(PAUSED).to_bool()])
     return get(PAUSED).to_bool() 
 
 @public
@@ -687,8 +719,10 @@ def verify() -> bool:
     auth = cast(list[UInt160], deserialize(serialized))
     for addr in auth: 
         if check_witness(addr):
+            debug(["Verification successful", addr])
             return True
 
+    debug(["Verification failed", addr])
     return False
 
 @public
@@ -704,8 +738,10 @@ def isWhitelisted() -> bool:
     auth = cast(list[UInt160], deserialize(serialized))
     for addr in auth: 
         if check_witness(addr):
+            debug(["Verification successful", addr])
             return True
 
+    debug(["Verification failed", addr])
     return False
 
 @public
@@ -717,6 +753,7 @@ def isPaused() -> bool:
 
     :return: whether the contract is paused
     """
+    debug(['isPaused: ', get(PAUSED).to_bool()])
     if get(PAUSED).to_bool():
         return True
     return False
@@ -734,6 +771,7 @@ def update(script: bytes, manifest: bytes):
     """
     assert verify(), '`acccount` is not allowed for update'
     update_contract(script, manifest) 
+    debug(['update called and done'])
 
 @public
 def destroy():
@@ -744,6 +782,7 @@ def destroy():
     """
     assert verify(), '`acccount` is not allowed for destroy'
     destroy_contract() 
+    debug(['destroy called and done'])
 
 def internal_burn(tokenId: bytes) -> bool:
     """
@@ -802,12 +841,15 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     add_to_supply(ctx, 1)
 
     add_meta(ctx, tokenIdBytes, meta)
+    debug(['metadata: ', meta])
 
     if not isinstance(lockedContent, None) or len(lockedContent) != 0:
         add_locked_content(ctx, tokenIdBytes, lockedContent)
+        debug(['locked: ', lockedContent])
 
     if not isinstance(royalties, None) or len(royalties) != 0:
         add_royalties(ctx, tokenIdBytes, royalties)
+        debug(['royalties: ', royalties])
 
     post_transfer(None, account, tokenIdBytes, None)
     on_mint(account, tokenId)
@@ -815,36 +857,44 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
 
 def get_token_data(ctx: StorageContext, tokenId: bytes) -> Union[bytes, None]:
     key = mk_token_data_key(tokenId)
+    debug(['get_token_data: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def add_token_data(ctx: StorageContext, tokenId: bytes, data: bytes):
     key = mk_token_data_key(tokenId)
+    debug(['add_token_data: ', key, tokenId])
     put(key, data, ctx)
 
 def get_owner_of(ctx: StorageContext, tokenId: bytes) -> UInt160:
     key = mk_token_key(tokenId)
+    debug(['get_owner_of: ', key, tokenId])
     owner = get(key, ctx)
     return UInt160(owner)
 
 def remove_owner_of(ctx: StorageContext, tokenId: bytes):
     key = mk_token_key(tokenId)
+    debug(['remove_owner_of: ', key, tokenId])
     delete(key, ctx)
 
 def set_owner_of(ctx: StorageContext, tokenId: bytes, owner: UInt160):
     key = mk_token_key(tokenId)
+    debug(['set_owner_of: ', key, tokenId])
     put(key, owner, ctx)
 
 def set_mint_fee(ctx: StorageContext, amount: int):
+    debug(['set_mint_fee: ', amount])
     put(MINT_FEE, amount, ctx)
 
 def add_to_supply(ctx: StorageContext, amount: int):
     total = totalSupply() + (amount)
+    debug(['add_to_supply: ', amount])
     put(SUPPLY_PREFIX, total, ctx)
 
 def set_balance(ctx: StorageContext, owner: UInt160, amount: int):
     old = balanceOf(owner)
     new = old + (amount)
+    debug(['set_balance: ', amount])
 
     key = mk_balance_key(owner)
     if (new > 0):
@@ -854,58 +904,71 @@ def set_balance(ctx: StorageContext, owner: UInt160, amount: int):
 
 def get_meta(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_meta_key(tokenId)
+    debug(['get_meta: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def remove_meta(ctx: StorageContext, tokenId: bytes):
     key = mk_meta_key(tokenId)
+    debug(['remove_meta: ', key, tokenId])
     delete(key, ctx)
 
 def add_meta(ctx: StorageContext, tokenId: bytes, meta: bytes):
     key = mk_meta_key(tokenId)
+    debug(['add_meta: ', key, tokenId])
     put(key, meta, ctx)
 
 def get_locked_content(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_locked_key(tokenId)
+    debug(['get_locked_content: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def remove_locked_content(ctx: StorageContext, tokenId: bytes):
     key = mk_locked_key(tokenId)
+    debug(['remove_locked_content: ', key, tokenId])
     delete(key, ctx)
 
 def add_locked_content(ctx: StorageContext, tokenId: bytes, content: bytes):
     key = mk_locked_key(tokenId)
+    debug(['add_locked_content: ', key, tokenId])
     put(key, content, ctx)
 
 def get_royalties(ctx: StorageContext, tokenId: bytes) -> bytes:
     key = mk_royalties_key(tokenId)
+    debug(['get_royalties: ', key, tokenId])
     val = get(key, ctx)
     return val
 
 def add_royalties(ctx: StorageContext, tokenId: bytes, royalties: bytes):
     key = mk_royalties_key(tokenId)
+    debug(['add_royalties: ', key, tokenId])
     put(key, royalties, ctx)
 
 def remove_royalties(ctx: StorageContext, tokenId: bytes):
     key = mk_royalties_key(tokenId)
+    debug(['remove_royalties: ', key, tokenId])
     delete(key, ctx)
 
 def get_locked_view_counter(ctx: StorageContext, tokenId: bytes) -> int:
     key = mk_lv_key(tokenId)
+    debug(['get_locked_view_counter: ', key, tokenId])
     return get(key, ctx).to_int()
 
 def remove_locked_view_counter(ctx: StorageContext, tokenId: bytes):
     key = mk_lv_key(tokenId)
+    debug(['remove_locked_view_counter: ', key, tokenId])
     delete(key, ctx)
 
 def set_locked_view_counter(ctx: StorageContext, tokenId: bytes):
     key = mk_lv_key(tokenId)
+    debug(['set_locked_view_counter: ', key, tokenId])
     count = get(key, ctx).to_int() + 1
     put(key, count)
 
 def get_mint_fee(ctx: StorageContext) -> int:
     fee = get(MINT_FEE, ctx).to_int()
+    debug(['get_mint_fee: ', fee])
     if fee is None:
         return 0
     return fee
