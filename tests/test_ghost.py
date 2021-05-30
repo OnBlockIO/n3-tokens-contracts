@@ -692,7 +692,7 @@ class GhostTest(BoaTest):
 
         # getMintFee should return the updated fee
         fee_event = engine.get_events('MintFeeUpdated')
-        updated_fee = fee_event[0].arguments[0]
+        updated_fee = fee_event[0].arguments[1]
         self.assertEqual(updated_fee, 1000)
 
         # getMintFee should return the updated fee
