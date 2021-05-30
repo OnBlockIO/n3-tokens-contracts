@@ -19,9 +19,9 @@ class GhostTest(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.debug.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.debug.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.debug.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
@@ -150,7 +150,7 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, True,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=bool)
-        auth_events = engine.get_events('Auth')
+        auth_events = engine.get_events('Authorized')
 
         # check if the event was triggered and the address was authorized
         self.assertEqual(0, auth_events[0].arguments[1])
@@ -161,7 +161,7 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, False,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=bool)
-        auth_events = engine.get_events('Auth')
+        auth_events = engine.get_events('Authorized')
         # check if the event was triggered and the address was authorized
         self.assertEqual(0, auth_events[1].arguments[1])
         self.assertEqual(0, auth_events[1].arguments[2])
@@ -172,7 +172,7 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, True,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=bool)
-        auth_events = engine.get_events('Auth')
+        auth_events = engine.get_events('Authorized')
 
         # check if the event was triggered and the address was authorized
         self.assertEqual(1, auth_events[0].arguments[1])
@@ -183,7 +183,7 @@ class GhostTest(BoaTest):
                 self.OTHER_ACCOUNT_1, False,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=bool)
-        auth_events = engine.get_events('Auth')
+        auth_events = engine.get_events('Authorized')
         # check if the event was triggered and the address was authorized
         self.assertEqual(1, auth_events[1].arguments[1])
         self.assertEqual(0, auth_events[1].arguments[2])
@@ -200,7 +200,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -244,7 +244,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -393,7 +393,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -454,7 +454,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -525,7 +525,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -564,7 +564,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -656,7 +656,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -676,7 +676,7 @@ class GhostTest(BoaTest):
         ghost_address = hash160(output)
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -717,7 +717,7 @@ class GhostTest(BoaTest):
         ghost_address = hash160(output)
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 
@@ -780,7 +780,7 @@ class GhostTest(BoaTest):
         ghost_address = hash160(output)
 
         # when deploying, the contract will mint tokens to the owner
-        deploy_event = engine.get_events('Deploy')
+        deploy_event = engine.get_events('Deployed')
         self.assertEqual(1, len(deploy_event))
         self.assertEqual(2, len(deploy_event[0].arguments))
 

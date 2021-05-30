@@ -39,7 +39,7 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 
 # Fee on deploy
-MINT_FEE_ON_DEPLOY = 500000 # initial mint fees of 0.05 GAS
+MINT_FEE_ON_DEPLOY = 5000000 # initial mint fees of 0.05 GAS
 
 # Symbol of the Token
 TOKEN_SYMBOL = 'GHOST'
@@ -101,7 +101,7 @@ on_auth = CreateNewEvent(
         ('type', int),
         ('add', bool),
     ],
-    'Auth'
+    'Authorized'
 )
 
 on_mint = CreateNewEvent(
@@ -110,7 +110,7 @@ on_mint = CreateNewEvent(
         ('creator', UInt160),
         ('tokenId', int)
     ],
-    'Mint'
+    'Minted'
 )
 
 on_withdraw_mint_fee = CreateNewEvent(
@@ -125,6 +125,7 @@ on_withdraw_mint_fee = CreateNewEvent(
 on_update_mint_fee = CreateNewEvent(
     #trigger when mint fees are updated.
     [
+        ('from_addr', UInt160),
         ('value', int)
     ],
     'MintFeeUpdated'
@@ -136,7 +137,7 @@ on_deploy = CreateNewEvent(
         ('owner', UInt160),
         ('symbol', str),
     ],
-    'Deploy'
+    'Deployed'
 )
 
 #DEBUG_START
@@ -490,7 +491,7 @@ def multiMint(account: UInt160, meta: List[bytes], lockedContent: List[bytes], r
     return nfts
 
 @public
-def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
+def mintWhitelisted(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token with no fees - whitelisted only.
 
@@ -508,9 +509,9 @@ def mintWithURI(account: UInt160, meta: bytes, lockedContent: bytes, royalties: 
     :raise AssertionError: raised if address is not whitelisted or if contract is paused
     """
     assert not isPaused(), "GhostMarket contract is currently paused"
-    assert isWhitelisted(), '`account` is not whitelisted for mintWithURI'
+    assert isWhitelisted(), '`account` is not whitelisted for mintWhitelisted'
 
-    # TODO what about royalties handling with mintWithURI()
+    # TODO what about royalties handling with mintWhitelisted()
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
@@ -583,7 +584,7 @@ def setMintFee(fee: int):
     assert verify(), '`acccount` is not allowed for setMintFee'
     ctx = get_context()
     set_mint_fee(ctx, fee)
-    on_update_mint_fee(fee)
+    on_update_mint_fee(calling_script_hash, fee)
 
 @public
 def getLockedContentViewCount(tokenId: bytes) -> int:
