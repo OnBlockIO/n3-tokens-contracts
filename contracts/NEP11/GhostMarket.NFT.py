@@ -456,10 +456,10 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     assert fee > 0, "Mint fee can't be < 0"
     assert check_witness(account), "Invalid witness" 
 
-    #if fee > 0:
+    if fee > 0:
         # TODO use calling_script_hash instead of account
-        #success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        #assert success, "Fee payment failed!" 
+        success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
+        assert success, "Fee payment failed!" 
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
