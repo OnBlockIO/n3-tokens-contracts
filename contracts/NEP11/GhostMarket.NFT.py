@@ -319,7 +319,7 @@ def tokens() -> Iterator:
     return find(TOKEN_PREFIX, ctx)
 
 @public
-def properties(tokenId: bytes) -> str:
+def properties(tokenId: bytes) -> Dict[str, str]:
     """
     Get the properties of a token.
 
@@ -334,7 +334,7 @@ def properties(tokenId: bytes) -> str:
     meta = get_meta(ctx, tokenId)
     assert len(meta) != 0, 'No metadata available for token'
     debug(['properties: ', meta])
-    return cast(str, json_deserialize(meta))
+    return cast(Dict[str, str], json_deserialize(meta))
 
 @public
 def _deploy(data: Any, upgrade: bool):
