@@ -844,11 +844,11 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     add_meta(ctx, tokenIdBytes, meta)
     debug(['metadata: ', meta])
 
-    if not isinstance(lockedContent, None) or len(lockedContent) != 0:
+    if len(lockedContent) != 0:
         add_locked_content(ctx, tokenIdBytes, lockedContent)
         debug(['locked: ', lockedContent])
 
-    if not isinstance(royalties, None) or len(royalties) != 0:
+    if len(royalties) != 0:
         add_royalties(ctx, tokenIdBytes, royalties)
         debug(['royalties: ', royalties])
 
