@@ -314,7 +314,7 @@ def tokens() -> Iterator:
     return find(TOKEN_PREFIX)
 
 @public
-def properties(tokenId: bytes) -> Dict[str, str]:
+def properties(tokenId: bytes) -> bytes:
     """
     Get the properties of a token.
 
@@ -328,7 +328,7 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     meta = get_meta(tokenId)
     assert len(meta) != 0, 'No metadata available for token'
     debug(['properties: ', meta])
-    return cast(Dict[str, str], json_deserialize(meta))
+    return meta
 
 @public
 def _deploy(data: Any, upgrade: bool):
@@ -820,8 +820,8 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     put(TOKEN_COUNT, tokenId)
     tokenIdBytes = tokenId.to_bytes()
     
-    if not isinstance(data, None):
-        add_token_data(tokenIdBytes, serialize(data))
+    #if data is not isinstance(data, None):             # TODO: NOT WORKING AS INTENDED
+    #    add_token_data(tokenIdBytes, serialize(data))  # TODO: NOT WORKING AS INTENDED
 
     set_owner_of(tokenIdBytes, account)
     set_balance(account, 1)
