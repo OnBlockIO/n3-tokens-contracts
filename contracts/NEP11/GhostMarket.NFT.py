@@ -508,7 +508,7 @@ def mintWhitelisted(account: UInt160, meta: bytes, lockedContent: bytes, royalti
     return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
-def getRoyalties(tokenId: bytes) -> str:
+def getRoyalties(tokenId: bytes) -> bytes:
     """
     Get a token royalties values.
 
@@ -518,8 +518,9 @@ def getRoyalties(tokenId: bytes) -> str:
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     royalties = get_royalties(tokenId)
-    debug(['get_royalties: ', royalties])
-    return cast(str, json_deserialize(royalties))
+    assert len(royalties) != 0, 'No royalties available for token'
+    debug(['getRoyalties: ', royalties])
+    return royalties
 
 @public
 def withdrawFee(account: UInt160) -> bool:
