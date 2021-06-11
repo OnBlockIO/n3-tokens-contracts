@@ -103,15 +103,6 @@ on_auth = CreateNewEvent(
     'Authorized'
 )
 
-on_mint = CreateNewEvent(
-    # trigger when a token has been minted.
-    [
-        ('creator', UInt160),
-        ('tokenId', int)
-    ],
-    'Minted'
-)
-
 on_withdraw_mint_fee = CreateNewEvent(
     # trigger when mint fees are withdrawn.
     [
@@ -128,15 +119,6 @@ on_update_mint_fee = CreateNewEvent(
         ('value', int)
     ],
     'MintFeeUpdated'
-)
-
-on_deploy = CreateNewEvent(
-    #trigger on contract deploy.
-    [
-        ('owner', UInt160),
-        ('symbol', str),
-    ],
-    'Deployed'
 )
 
 #DEBUG_START
@@ -362,8 +344,6 @@ def _deploy(data: Any, upgrade: bool):
     wl.append(tx.sender)
     wl_serialized = serialize(auth)
     put(WL_ADDRESSES, wl_serialized)
-
-    on_deploy(tx.sender, symbol())
 
 @public
 def onNEP11Payment(from_address: UInt160, amount: int, tokenId: bytes, data: Any):
@@ -840,7 +820,6 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
         debug(['royalties: ', royalties])
 
     post_transfer(None, account, tokenIdBytes, None)
-    on_mint(account, tokenId)
     return tokenIdBytes
 
 
