@@ -585,7 +585,10 @@ def getLockedContent(tokenId: bytes) -> bytes:
     set_locked_view_counter(tokenId)
     
     debug(['getLockedContent: ', get_locked_content(tokenId)])
-    return get_locked_content(tokenId)
+    content = get_locked_content(tokenId)
+    counter = get_locked_view_counter(tokenId)
+    on_unlock(tokenId, counter)
+    return content
 
 @public
 def setAuthorizedAddress(address: UInt160, authorized: bool):
