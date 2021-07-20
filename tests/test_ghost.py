@@ -22,6 +22,8 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
+    # TODO add .env file and move test engine path there
+    TEST_ENGINE_PATH = '/home/merl/source/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
@@ -51,8 +53,7 @@ class GhostTest(BoaTest):
 
     def prepare_testengine(self, preprocess=False) -> TestEngine:
         self.build_contract(preprocess)
-        root_folder = self.BOA_PATH
-        engine = TestEngine(root_folder)
+        engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
         self.deploy_contract(engine)
         return engine
