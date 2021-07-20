@@ -5,7 +5,7 @@ from boa3.builtin.contract import Nep17TransferEvent, abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import NEO, GAS, call_contract, destroy_contract, update_contract
 from boa3.builtin.interop.runtime import notify, log, calling_script_hash, executing_script_hash, check_witness, script_container
-from boa3.builtin.interop.binary import serialize, deserialize, base58_encode
+from boa3.builtin.interop.stdlib import serialize, deserialize, base58_encode
 from boa3.builtin.interop.storage import delete, get, put, find, get_context
 from boa3.builtin.interop.iterator import Iterator
 from boa3.builtin.interop.crypto import ripemd160, sha256
@@ -117,6 +117,14 @@ on_update_mint_fee = CreateNewEvent(
     [
         ('from_addr', UInt160),
         ('value', int)
+    ],
+    'MintFeeUpdated'
+)
+
+on_unlock = CreateNewEvent(
+    [
+        ('tokenId', bytes),
+        ('counter', int)
     ],
     'MintFeeUpdated'
 )
