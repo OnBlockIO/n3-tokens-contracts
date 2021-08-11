@@ -22,7 +22,7 @@ def manifest_metadata() -> NeoMetadata:
     meta = NeoMetadata()
     meta.author = "Vincent Geneste, Mathias Enzensberger"
     meta.description = "GhostMarket NEP17 contract"
-    meta.email = "hi@ghostmarket.io"
+    meta.email = "hello@ghostmarket.io"
     meta.supportedstandards = "NEP-17"
     return meta
 
