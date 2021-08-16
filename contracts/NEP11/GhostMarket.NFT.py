@@ -28,8 +28,8 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Mathias Enzensberger, Vincent Geneste"
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
-    # meta.supportedstandards = "NEP-11" # TODO: NOT SUPPORTED YET
-    # meta.permissions = [{"contract": "*","methods": "*"}] # TODO: NOT SUPPORTED YET
+    meta.supportedstandards = ["NEP-11"]
+    meta.permissions = [{"contract": "*","methods": "*"}]
     return meta
 
 
@@ -38,7 +38,7 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 
 # Fee on deploy
-MINT_FEE_ON_DEPLOY = 5000000 # initial mint fees of 0.05 GAS
+MINT_FEE_ON_DEPLOY = 5_000_000 # initial mint fees of 0.05 GAS
 
 # Symbol of the Token
 TOKEN_SYMBOL = 'GHOST'
@@ -126,7 +126,7 @@ on_unlock = CreateNewEvent(
         ('tokenId', bytes),
         ('counter', int)
     ],
-    'MintFeeUpdated'
+    'UnlockIncremented'
 )
 
 #DEBUG_START
@@ -586,6 +586,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     :type tokenId: ByteString
     :return: the lock content of this token.
     :raise AssertionError: raised if witness is not owner
+    :emits UnlockIncremented
     """
     owner = get_owner_of(tokenId)
 
