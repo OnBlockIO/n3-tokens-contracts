@@ -28,7 +28,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Mathias Enzensberger, Vincent Geneste"
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
-    meta.supportedstandards = ["NEP-11"]
+    meta.supported_standards = ["NEP-11"]
     meta.permissions = [{"contract": "*","methods": "*"}]
     return meta
 
