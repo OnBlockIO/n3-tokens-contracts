@@ -506,7 +506,6 @@ def getRoyalties(tokenId: bytes) -> bytes:
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     royalties = get_royalties(tokenId)
-    assert len(royalties) != 0, 'No royalties available for token'
     debug(['getRoyalties: ', royalties])
     return royalties
 
