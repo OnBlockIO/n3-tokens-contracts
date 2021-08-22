@@ -57,25 +57,25 @@ PAUSED = b'paused'
 # Prefixes
 # -------------------------------------------
 
-ACCOUNT_PREFIX = b'A'
-TOKEN_PREFIX = b'T'
-TOKEN_DATA_PREFIX = b'TD'
-LOCKED_PREFIX = b'LC'
-BALANCE_PREFIX = b'B'
-SUPPLY_PREFIX = b'S'
-META_PREFIX = b'M'
-LOCKED_VIEW_COUNT_PREFIX = b'LV'
-ROYALTIES_PREFIX = b'R'
+ACCOUNT_PREFIX = b'ACC'
+TOKEN_PREFIX = b'TPF'
+TOKEN_DATA_PREFIX = b'TDP'
+LOCKED_PREFIX = b'LCP'
+BALANCE_PREFIX = b'BLP'
+SUPPLY_PREFIX = b'SPP'
+META_PREFIX = b'MDP'
+LOCKED_VIEW_COUNT_PREFIX = b'LVCP'
+ROYALTIES_PREFIX = b'RYP'
 
 
 # -------------------------------------------
 # Keys
 # -------------------------------------------
 
-TOKEN_COUNT = b'TC'
-MINT_FEE = b'F'
-AUTH_ADDRESSES = b'AU'
-WL_ADDRESSES = b'W'
+TOKEN_COUNT = b'TOKEN_COUNT'
+MINT_FEE = b'MINT_FEE'
+AUTH_ADDRESSES = b'AUTH_ADDRESSES'
+WL_ADDRESSES = b'WITHLISTED'
 
 
 # -------------------------------------------
