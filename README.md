@@ -12,6 +12,16 @@ Coming soon...
 
 Upgradable NEP11 Contract.
 
+## Metadata
+
+This contract features two methods to handle properties:
+
+`properties` and `propertiesJson`
+
+`properties` returns a MAP of all the NFT metadata, and is what follows NEP11 standard (even though currently the standard is inconsistent as the signature shows it should be a MAP, while the explanation tied to it shows it should be a serialized NVM object).
+
+`propertiesJson` returns a serialized JSON string of all the NFT metadata, and is what makes more sense for us to handle metadata. Contract supports ways both for convenience purposes.
+
 ### Compiling contract
 ```
 .compile.py
