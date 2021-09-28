@@ -23,14 +23,16 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
+    TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
+    TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}' , 'utf-8')
     LOCK_CONTENT = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8')
+    CONTRACT = UInt160()
 
     def build_contract(self, preprocess=False):
         print('contract path: ' + self.CONTRACT_PATH_PY)
@@ -43,6 +45,7 @@ class GhostTest(BoaTest):
             os.chdir(old)
         else:
             output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
+            self.CONTRACT = hash160(output)
 
     def deploy_contract(self, engine):
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
@@ -268,14 +271,14 @@ class GhostTest(BoaTest):
                 expected_result_type=bytes)
 
         print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=bytes)
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token, expected_result_type=bytes)
         print("props: " + str(properties))
         royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
         print("royalties: " + str(royalties))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
-            properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties',
+            properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson',
                     bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=bytes)
         print("props: " + str(properties))
 
@@ -443,6 +446,38 @@ class GhostTest(BoaTest):
         self.assertEqual(3, ghost_supply_after)
         self.print_notif(engine.notifications)
 
+    def test_ghost_properties(self):
+        engine = self.prepare_testengine()
+        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
+        # output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
+        # ghost_address = hash160(output)
+        # print(to_hex_str(ghost_address))
+        output, manifest = self.compile_and_save(aux_path)
+        aux_address = hash160(output)
+        print(to_hex_str(aux_address))
+
+        # when deploying, the contract will mint tokens to the owner
+        # deploy_event = engine.get_events('Deployed')
+        # self.assertEqual(1, len(deploy_event))
+        # self.assertEqual(2, len(deploy_event[0].arguments))
+
+        # add some gas for fees
+        add_amount = 10 * 10 ** 8
+        engine.add_gas(aux_address, add_amount)
+
+        # mint
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
+                aux_address, self.TOKEN_META_2, self.LOCK_CONTENT, self.ROYALTIES, None,
+                signer_accounts=[aux_address],
+                expected_result_type=bytes)
+
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=Dict[str, str])
+        print("props: " + str(properties))
+        print("props: " + properties['name'])
+        self.assertEqual(properties['name'], 'GHOST')
+
+
     def test_ghost_transfer(self):
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
@@ -468,7 +503,7 @@ class GhostTest(BoaTest):
                 aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token)
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token)
         print("props: " + str(properties))
 
         # check balances after
