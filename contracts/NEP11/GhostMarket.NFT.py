@@ -784,6 +784,67 @@ def destroy():
     destroy_contract() 
     debug(['destroy called and done'])
 
+
+def strRemove(src: str, toRemove: str) -> str:
+    assert len(toRemove) == 1, 'Only single replacement allowed'
+    newStr = ""
+    for i in range(0, len(src)):
+        if (src[i] != toRemove):
+            newStr += src[i]
+    return newStr
+
+def strContains(src: str, dest: str) -> int:
+    '''
+        Returns the position of `dest` when found, else -1
+    '''
+    result: int = -1 
+    for i in range(0, len(src)):
+        if (src[i] == dest):
+            result = i
+            break
+    return result
+
+def strMultiply(src: str, cnt: int) -> str:
+    varStr = ""
+    for i in range(0, cnt):
+        varStr += src
+    return varStr
+
+@public
+def fixRoyalties(tokens: List[bytes]):
+    assert verify(), '`acccount` is not allowed'
+    for i in range(0, len(tokens)):
+        rBytes = get_royalties(tokens[i])
+        royalties = cast(List[Dict[str,str]], json_deserialize(rBytes))
+        newL: List[Dict[str,str]] = []
+
+        for entry in royalties: 
+            val = entry['value']
+            valLength = len(val)
+            pos = strContains(val, ".")
+            if (valLength <= 2 and pos == -1):
+                newD: Dict[str,str] = {} 
+                newD['address'] = entry['address']
+                newD['value'] = entry['value'] + "00"
+                newL.append(newD)
+            elif (pos > -1):
+                newD: Dict[str,str] = {} 
+                newD['address'] = entry['address']
+                # remove the unwanted character 
+                fixedStr = strRemove(entry['value'], ".")
+
+                # create and add multiplier to get bps
+                toAdd = strMultiply("0", pos)
+                newD['value'] = fixedStr + toAdd
+
+                newL.append(newD)
+                
+
+        if (len(newL) == len(royalties)):
+            b = json_serialize(newL)
+            add_royalties(tokens[i], b)
+
+
 def internal_burn(tokenId: bytes) -> bool:
     """
     Burn a token - internal
