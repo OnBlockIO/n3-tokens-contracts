@@ -23,7 +23,7 @@ class TestNEP17(BoaTest):
     CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/NEP17.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/NEP17.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/NEP17.py'
-    TEST_ENGINE_PATH = '/home/merl/source/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
+    TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
@@ -59,7 +59,7 @@ class TestNEP17(BoaTest):
             self.build_contract(preprocess)
         engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
-        self.deploy_contract(engine)
+        # self.deploy_contract(engine)
         return engine
 
     def test_nep17_compile(self):
@@ -228,10 +228,10 @@ class TestNEP17(BoaTest):
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
 
-        transfer_events = engine.get_events('Transfer')
-        self.assertEqual(1, len(transfer_events))
-        transfer_event = transfer_events[0]
-        self.assertEqual(3, len(transfer_event.arguments))
+        # transfer_events = engine.get_events('Transfer')
+        # self.assertEqual(1, len(transfer_events))
+        # transfer_event = transfer_events[0]
+        # self.assertEqual(3, len(transfer_event.arguments))
 
         sender, receiver, amount = transfer_event.arguments
         if isinstance(sender, str):
@@ -259,7 +259,7 @@ class TestNEP17(BoaTest):
 
     def test_nep17_verify(self):
         engine = TestEngine(self.TEST_ENGINE_PATH)
-        self.deploy_contract(engine)
+        # self.deploy_contract(engine)
 
         # should fail without signature
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
