@@ -20,9 +20,9 @@ class TestNEP17(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/NEP17.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/NEP17.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/NEP17.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarket.Token.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.py'
     TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
@@ -65,8 +65,8 @@ class TestNEP17(BoaTest):
     def test_nep17_compile(self):
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
 
-        self.assertIn('supportedstandards', manifest)
-        self.assertIsInstance(manifest['supportedstandards'], list)
+        self.assertIn('supported_standards', manifest)
+        self.assertIsInstance(manifest['supported_standards'], list)
         # self.assertGreater(len(manifest['supportedstandards']), 0)
         # self.assertIn('NEP-17', manifest['supportedstandards'])
 

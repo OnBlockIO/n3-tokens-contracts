@@ -64,12 +64,12 @@ debug_block_start = ['#DEBUG_START']
 debug_block_end = ['#DEBUG_END']
 
 CONTRACT_DIR = GHOST_ROOT + '/contracts/NEP17/'
-CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GM.py'
-CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP17/GM.manifest.json'
-CONTRACT_PATH_NEFDBG = GHOST_ROOT + '/contracts/NEP17/GM.nefdbgnfo'
-CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GM.nef'
+CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.py'
+CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.manifest.json'
+CONTRACT_PATH_NEFDBG = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.nefdbgnfo'
+CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.nef'
  
-CONTRACT_PATH_PY_CLEANED = GHOST_ROOT + '/contracts/NEP17/GM_cleaned.py'
+CONTRACT_PATH_PY_CLEANED = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token_cleaned.py'
  
 cleanup()
 preprocess_contract(to_remove, CONTRACT_PATH_PY, CONTRACT_PATH_PY_CLEANED, CONTRACT_DIR)
