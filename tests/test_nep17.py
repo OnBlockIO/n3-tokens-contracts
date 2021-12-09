@@ -20,11 +20,12 @@ class TestNEP17(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarket.Token.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarket.Token.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarketNEP17.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketNEP17.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketNEP17.py'
     TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
+    DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
@@ -41,45 +42,16 @@ class TestNEP17(BoaTest):
                                          signer_accounts=[self.OWNER_SCRIPT_HASH])
         self.assertEqual(VoidType, result)
 
-    def build_contract(self, preprocess=False):
-        print('contract path: ' + self.CONTRACT_PATH_PY)
-        if preprocess:
-            import os
-            old = os.getcwd()
-            os.chdir(self.GHOST_ROOT)
-            file = self.GHOST_ROOT + '/compile.py'
-            os.system(file)
-            os.chdir(old)
-        else:
-            output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
-        CONTRACT_BUILT = True;
-
     def prepare_testengine(self, preprocess=False) -> TestEngine:
-        if not CONTRACT_BUILT:
-            self.build_contract(preprocess)
         engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
-        # self.deploy_contract(engine)
         return engine
 
     def test_nep17_compile(self):
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
 
-        self.assertIn('supported_standards', manifest)
-        self.assertIsInstance(manifest['supported_standards'], list)
-        # self.assertGreater(len(manifest['supportedstandards']), 0)
-        # self.assertIn('NEP-17', manifest['supportedstandards'])
-
-    def test_nep17_deploy(self):
-        # prepare_testengine already deploys the contract and verifies it's successfully deployed
-        engine = self.prepare_testengine()
-
-        # must always return false after first execution
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', None, False,
-                                             signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        self.print_notif(engine.notifications)
+        self.assertIn('supportedstandards', manifest)
+        self.assertIsInstance(manifest['supportedstandards'], list)
 
     def test_nep17_symbol(self):
         engine = self.prepare_testengine()
@@ -103,7 +75,8 @@ class TestNEP17(BoaTest):
 
         engine = self.prepare_testengine()
 
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OWNER_SCRIPT_HASH)
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT,
+                                                         signer_accounts=[self.OWNER_SCRIPT_HASH])
         self.print_notif(engine.notifications)
         self.assertEqual(total_supply, result)
 
@@ -119,25 +92,6 @@ class TestNEP17(BoaTest):
         transferred_amount = 10 * 10 ** 8  # 10 tokens
 
         engine = self.prepare_testengine()
-
-        # should fail before running deploy
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, transferred_amount, None,
-                                         expected_result_type=bool)
-        self.assertEqual(False, result)
-        # when deploying, the contract will mint tokens to the owner
-        transfer_events = engine.get_events('Transfer')
-        self.assertEqual(1, len(transfer_events))
-        self.assertEqual(3, len(transfer_events[0].arguments))
-
-        sender, receiver, amount = transfer_events[0].arguments
-        if isinstance(sender, str):
-            sender = String(sender).to_bytes()
-        if isinstance(receiver, str):
-            receiver = String(receiver).to_bytes()
-        self.assertEqual(None, sender)
-        self.assertEqual(self.OWNER_SCRIPT_HASH, receiver)
-        self.assertEqual(100_000_000 * 100_000_000, amount)
 
         # should fail if the sender doesn't sign
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
@@ -166,10 +120,10 @@ class TestNEP17(BoaTest):
                                     self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, -10, None)
 
         # fire the transfer event when transferring to yourself
-        balance_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OWNER_SCRIPT_HASH)
+        balance_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.OWNER_SCRIPT_HASH, self.OWNER_SCRIPT_HASH, transferred_amount, None,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         self.DEPLOYER_ACCOUNT, self.DEPLOYER_ACCOUNT, transferred_amount, None,
+                                         signer_accounts=[self.DEPLOYER_ACCOUNT],
                                          expected_result_type=bool)
         self.assertEqual(True, result)
         transfer_events = engine.get_events('Transfer')
@@ -181,19 +135,19 @@ class TestNEP17(BoaTest):
             sender = String(sender).to_bytes()
         if isinstance(receiver, str):
             receiver = String(receiver).to_bytes()
-        self.assertEqual(self.OWNER_SCRIPT_HASH, sender)
-        self.assertEqual(self.OWNER_SCRIPT_HASH, receiver)
+        self.assertEqual(self.DEPLOYER_ACCOUNT, sender)
+        self.assertEqual(self.DEPLOYER_ACCOUNT, receiver)
         self.assertEqual(transferred_amount, amount)
 
         # transferring to yourself doesn't change the balance
-        balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OWNER_SCRIPT_HASH)
+        balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
         self.assertEqual(balance_before, balance_after)
 
         # does fire the transfer event
-        balance_sender_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OWNER_SCRIPT_HASH)
+        balance_sender_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
         balance_receiver_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OTHER_ACCOUNT_1)
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, transferred_amount, None,
+                                         self.DEPLOYER_ACCOUNT, self.OTHER_ACCOUNT_1, transferred_amount, None,
                                          signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
         self.assertEqual(True, result)
@@ -206,73 +160,12 @@ class TestNEP17(BoaTest):
             sender = String(sender).to_bytes()
         if isinstance(receiver, str):
             receiver = String(receiver).to_bytes()
-        self.assertEqual(self.OWNER_SCRIPT_HASH, sender)
+        self.assertEqual(self.DEPLOYER_ACCOUNT, sender)
         self.assertEqual(self.OTHER_ACCOUNT_1, receiver)
         self.assertEqual(transferred_amount, amount)
 
         # transferring to someone other than yourself does change the balance
-        balance_sender_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OWNER_SCRIPT_HASH)
+        balance_sender_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
         balance_receiver_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OTHER_ACCOUNT_1)
         self.assertEqual(balance_sender_before - transferred_amount, balance_sender_after)
         self.assertEqual(balance_receiver_before + transferred_amount, balance_receiver_after)
-
-    def test_nep17_onPayment(self):
-        transferred_amount = 10 * 10 ** 8  # 10 tokens
-
-        engine = self.prepare_testengine()
-
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
-        nep17_address = hash160(output)
-
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-
-        # transfer_events = engine.get_events('Transfer')
-        # self.assertEqual(1, len(transfer_events))
-        # transfer_event = transfer_events[0]
-        # self.assertEqual(3, len(transfer_event.arguments))
-
-        sender, receiver, amount = transfer_event.arguments
-        if isinstance(sender, str):
-            sender = String(sender).to_bytes()
-        if isinstance(receiver, str):
-            receiver = String(receiver).to_bytes()
-        self.assertEqual(None, sender)
-        self.assertEqual(self.OWNER_SCRIPT_HASH, receiver)
-        self.assertEqual(100_000_000 * 100_000_000, amount)
-
-        engine.add_neo(aux_address, transferred_amount)
-        engine.add_gas(aux_address, transferred_amount)
-
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            result = self.run_smart_contract(engine, aux_path, 'calling_transfer', constants.NEO_SCRIPT,
-                                         aux_address, nep17_address, transferred_amount, None,
-                                         signer_accounts=[aux_address],
-                                         expected_result_type=bool)
-
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            result = self.run_smart_contract(engine, aux_path, 'calling_transfer', constants.GAS_SCRIPT,
-                                         aux_address, nep17_address, transferred_amount, None,
-                                         signer_accounts=[aux_address],
-                                         expected_result_type=bool)
-
-    def test_nep17_verify(self):
-        engine = TestEngine(self.TEST_ENGINE_PATH)
-        # self.deploy_contract(engine)
-
-        # should fail without signature
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-                                         expected_result_type=bool)
-        self.assertEqual(False, result)
-
-        # should fail if not signed by the owner
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-                                         signer_accounts=[self.OTHER_ACCOUNT_1],
-                                         expected_result_type=bool)
-        self.assertEqual(False, result)
-
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        self.assertEqual(True, result)

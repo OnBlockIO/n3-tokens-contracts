@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 from pathlib import Path
 from boa3_test.tests.boa_test import BoaTest
@@ -20,9 +21,9 @@ class GhostTest(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarketNEP11.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.py'
     # TODO add .env file and move test engine path there
     TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
@@ -61,7 +62,6 @@ class GhostTest(BoaTest):
         #self.assertEqual(VoidType, result)
 
     def prepare_testengine(self, preprocess=False) -> TestEngine:
-        self.build_contract(preprocess)
         engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
         
@@ -74,10 +74,8 @@ class GhostTest(BoaTest):
             print(f"{str(notif.name)}: {str(notif.arguments)}")
         print('\n=========================== NOTIFICATIONS END ===========================\n')
 
-    def test_ghost_compile(self):
-        self.build_contract()
-
     def test_ghost_symbol(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         result = engine.run(self.CONTRACT_PATH_NEF, 'symbol', reset_engine=True)
         self.print_notif(engine.notifications)
@@ -86,6 +84,7 @@ class GhostTest(BoaTest):
         assert result == 'GHOST'
 
     def test_ghost_decimals(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         result = engine.run(self.CONTRACT_PATH_NEF, 'decimals', reset_engine=True)
         self.print_notif(engine.notifications)
@@ -94,6 +93,7 @@ class GhostTest(BoaTest):
         assert result == 0
 
     def test_ghost_total_supply(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         result = engine.run(self.CONTRACT_PATH_NEF, 'totalSupply', reset_engine=True)
         self.print_notif(engine.notifications)
@@ -102,11 +102,13 @@ class GhostTest(BoaTest):
         assert result == 0
 
     def test_ghost_deploy(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         # prepare_testengine already deploys the contract and verifies it's successfully deployed
         self.print_notif(engine.notifications)
 
     def test_ghost_update(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
 
         # updating ghost smart contract
@@ -127,6 +129,7 @@ class GhostTest(BoaTest):
         self.assertEqual(VoidType, result)
 
     def test_ghost_destroy(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
 
         # destroy contract
@@ -141,6 +144,7 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_verify(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
 
         # should return  false, account is not verified
@@ -175,6 +179,7 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_authorize(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
                 self.OTHER_ACCOUNT_1, True,
@@ -197,6 +202,7 @@ class GhostTest(BoaTest):
         self.assertEqual(0, auth_events[1].arguments[2])
 
     def test_ghost_whitelist(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setWhitelistedAddress', 
                 self.OTHER_ACCOUNT_1, True,
@@ -219,12 +225,10 @@ class GhostTest(BoaTest):
         self.assertEqual(0, auth_events[1].arguments[2])
 
     def test_ghost_pause(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -257,92 +261,8 @@ class GhostTest(BoaTest):
             expected_result_type=bytes)
         self.print_notif(engine.notifications)
 
-    def test_ghost_fix_royalties(self):
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # should fail because account does not have enough for fees
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                # aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
-                aux_address, bytes(0), bytes(0), bytes(0), None,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-
-        # add some gas for fees
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # should succeed now that account has enough fees
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
-        print("royalties: " + str(royalties))
-        self.assertEqual(self.ROYALTIES, royalties)
-        tokens = [ token ]
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'fixRoyalties', tokens, signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=VoidType)
-
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'fixRoyalties', tokens, signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=VoidType)
-
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
-        print("royalties2: " + str(royalties))
-        royaltiesCheck = bytes('[{"address":"someaddress","value":"2000"},{"address":"someaddress2","value":"3000"}]','utf-8')
-        print("royalties3: " + str(royaltiesCheck))
-        self.assertEqual(royaltiesCheck, royalties)
-
-        self.print_notif(engine.notifications)
-
-
-    def test_ghost_fix_royalties2(self):
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        royaltiesFalse = bytes('[{"address":"someaddress","value":"2.5"},{"address":"someaddress2","value":"30"}]','utf-8')
-
-        # add some gas for fees
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # should succeed now that account has enough fees
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, royaltiesFalse, None,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
-        print("royalties: " + str(royalties))
-        self.assertEqual(royaltiesFalse, royalties)
-        tokens = [ token ]
-        print("first run")
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'fixRoyalties', tokens, signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=VoidType)
-
-        print("second run")
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'fixRoyalties', tokens, signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=VoidType)
-
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
-        print("royalties2: " + str(royalties))
-        royaltiesCheck = bytes('[{"address":"someaddress","value":"250"},{"address":"someaddress2","value":"3000"}]','utf-8')
-        print("royalties3: " + str(royaltiesCheck))
-        self.assertEqual(royaltiesCheck, royalties)
-
-        self.print_notif(engine.notifications)
-
     def test_ghost_mint(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
@@ -396,12 +316,10 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_gas_cost(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -487,6 +405,7 @@ class GhostTest(BoaTest):
         print("burn: " + gasConsumed + " GAS")
 
     def test_ghost_multi_mint(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
@@ -542,12 +461,10 @@ class GhostTest(BoaTest):
         print("tokens after: " + str(ghost_tokens_after))
 
     def test_ghost_properties(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        # output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        # ghost_address = hash160(output)
-        # print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -569,6 +486,7 @@ class GhostTest(BoaTest):
 
 
     def test_ghost_transfer(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
@@ -635,12 +553,10 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_burn(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -670,12 +586,10 @@ class GhostTest(BoaTest):
 
 
     def test_ghost_multi_burn(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -729,12 +643,10 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_onNEP11Payment(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -757,12 +669,10 @@ class GhostTest(BoaTest):
                 expected_result_type=bool)
 
     def test_ghost_onNEP17Payment(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
@@ -777,10 +687,9 @@ class GhostTest(BoaTest):
                                     signer_accounts=[aux_address])
 
     def test_ghost_mint_fee(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
 
         # add some gas for fees
         add_amount = 10 * 10 ** 8
@@ -813,6 +722,7 @@ class GhostTest(BoaTest):
         self.print_notif(engine.notifications)
 
     def test_ghost_fee_balance(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
@@ -871,11 +781,9 @@ class GhostTest(BoaTest):
 
         
     def test_ghost_locked_content(self):
+        print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-
 
         # add some gas for fees
         add_amount = 10 * 10 ** 8

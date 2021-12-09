@@ -227,15 +227,14 @@ def _deploy(data: Any, upgrade: bool):
     if upgrade:
         return
 
-    if get(DEPLOYED).to_bool():
-        abort()
+    #if get(DEPLOYED).to_bool():
+    #    abort()
 
-    if get(SUPPLY_KEY).to_int() > 0:
-        abort()
+    #if get(SUPPLY_KEY).to_int() > 0:
+    #    abort()
 
     tx = cast(Transaction, script_container)
     owner: UInt160 = tx.sender
-    network = get_network()
     internal_deploy(owner)
 
 
