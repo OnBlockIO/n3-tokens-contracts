@@ -62,5 +62,35 @@ individual test can be run witn
 python -m unittest test_ghost.GhostTest.test_ghost_decimals
 ```
 
+# GhostMarket GM NEP17 Contract
 
+## Deployed Contract:
 
+#### GhostMarketToken
+https://dora.coz.io/contract/neo3/mainnet/0x9b049f1283515eef1d3f6ac610e1595ed25ca3e9
+
+## Audit
+
+Coming soon...
+
+## Technical Information
+
+Upgradable NEP17 Contract.
+
+### Compiling contract
+```
+.compile2.py
+or
+neo3-boa GhostMarketToken.py
+```
+
+### Deploying from neo-cli
+```
+open wallet <wallet path>
+deploy <nef path> <manifest.path>
+```
+
+### Upgrading from neo-cli
+```
+open wallet <path>
+update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
