@@ -94,6 +94,7 @@ deploy <nef path> <manifest.path>
 ```
 open wallet <path>
 update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
+```
 
 ## Testing
 
