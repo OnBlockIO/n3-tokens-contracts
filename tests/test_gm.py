@@ -20,9 +20,9 @@ class TestNEP17(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarketNEP17.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketNEP17.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketNEP17.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarketToken.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
     TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
@@ -47,30 +47,30 @@ class TestNEP17(BoaTest):
         engine.reset_engine()
         return engine
 
-    def test_nep17_compile(self):
+    def test_gm_compile(self):
         output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
 
         self.assertIn('supportedstandards', manifest)
         self.assertIsInstance(manifest['supportedstandards'], list)
 
-    def test_nep17_symbol(self):
+    def test_gm_symbol(self):
         engine = self.prepare_testengine()
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'symbol', expected_result_type=str)
         self.assertEqual('GM', result)
 
-    def test_nep17_decimals(self):
+    def test_gm_decimals(self):
         engine = self.prepare_testengine()
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'decimals')
         self.assertEqual(8, result)
 
-    def test_nep17_total_supply(self):
+    def test_gm_total_supply(self):
         total_supply = 100_000_000 * 10 ** 8
 
         engine = self.prepare_testengine()
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
         self.assertEqual(total_supply, result)
 
-    def test_nep17_total_balance_of(self):
+    def test_gm_total_balance_of(self):
         total_supply = 100_000_000 * 10 ** 8
 
         engine = self.prepare_testengine()
@@ -88,7 +88,7 @@ class TestNEP17(BoaTest):
 
         self.print_notif(engine.notifications)
 
-    def test_nep17_total_transfer(self):
+    def test_gm_total_transfer(self):
         transferred_amount = 10 * 10 ** 8  # 10 tokens
 
         engine = self.prepare_testengine()

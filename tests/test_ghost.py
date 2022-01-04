@@ -21,9 +21,9 @@ class GhostTest(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarketNEP11.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.py'
+    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
+    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
+    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     # TODO add .env file and move test engine path there
     TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'

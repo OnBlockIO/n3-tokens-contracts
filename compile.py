@@ -64,12 +64,12 @@ debug_block_start = ['#DEBUG_START']
 debug_block_end = ['#DEBUG_END']
 
 CONTRACT_DIR = GHOST_ROOT + '/contracts/NEP11/'
-CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.py'
-CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.manifest.json'
-CONTRACT_PATH_NEFDBG = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.nefdbgnfo'
-CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11.nef'
+CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
+CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.manifest.json'
+CONTRACT_PATH_NEFDBG = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nefdbgnfo'
+CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
  
-CONTRACT_PATH_PY_CLEANED = GHOST_ROOT + '/contracts/NEP11/GhostMarketNEP11_cleaned.py'
+CONTRACT_PATH_PY_CLEANED = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT_cleaned.py'
  
 cleanup()
 preprocess_contract(to_remove, CONTRACT_PATH_PY, CONTRACT_PATH_PY_CLEANED, CONTRACT_DIR)
