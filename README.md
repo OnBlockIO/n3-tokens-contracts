@@ -94,3 +94,16 @@ deploy <nef path> <manifest.path>
 ```
 open wallet <path>
 update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
+
+## Testing
+
+tests can be run with:
+
+```
+test_gm.py
+```
+
+individual test can be run witn  
+```
+python -m unittest test_gm.GhostTest.test_gm_decimals
+```
