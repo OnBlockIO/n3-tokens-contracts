@@ -217,7 +217,9 @@ def tokensOf(owner: UInt160) -> Iterator:
     :raise AssertionError: raised if `owner` length is not 20.
     """
     assert len(owner) == 20, "Incorrect `owner` length"
-    return find(mk_account_key(owner))
+    flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
+    context = get_context()
+    return find(mk_account_key(owner), context, flags)
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
