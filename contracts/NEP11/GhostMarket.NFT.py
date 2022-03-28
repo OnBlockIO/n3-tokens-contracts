@@ -540,7 +540,7 @@ def mintWhitelisted(account: UInt160, meta: bytes, lockedContent: bytes, royalti
     # TODO what about royalties handling with mintWhitelisted()
     return internal_mint(account, meta, lockedContent, royalties, data)
 
-@public
+@public(safe=True)
 def getRoyalties(tokenId: bytes) -> bytes:
     """
     Get a token royalties values.
