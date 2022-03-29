@@ -31,7 +31,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
     meta.supported_standards = ["NEP-11"]
-    meta.permissions = [{"contract": "*","methods": "*"}]
+    meta.add_permission(contract='*', methods=['*'])
     return meta
 
 
@@ -147,7 +147,7 @@ debug = CreateNewEvent(
 # NEP-11 Methods
 # -------------------------------------------
 
-@public
+@public(safe=True)
 def symbol() -> str:
     """
     Gets the symbols of the token.
@@ -161,7 +161,7 @@ def symbol() -> str:
     debug(['symbol: ', TOKEN_SYMBOL])
     return TOKEN_SYMBOL
 
-@public
+@public(safe=True)
 def decimals() -> int:
     """
     Gets the amount of decimals used by the token.
@@ -174,7 +174,7 @@ def decimals() -> int:
     debug(['decimals: ', TOKEN_DECIMALS])
     return TOKEN_DECIMALS
 
-@public
+@public(safe=True)
 def totalSupply() -> int:
     """
     Gets the total token supply deployed in the system.
@@ -188,7 +188,7 @@ def totalSupply() -> int:
     debug(['totalSupply: ', get(SUPPLY_PREFIX).to_int()])
     return get(SUPPLY_PREFIX).to_int()
 
-@public
+@public(safe=True)
 def balanceOf(owner: UInt160) -> int:
     """
     Get the current balance of an address
@@ -204,7 +204,7 @@ def balanceOf(owner: UInt160) -> int:
     debug(['balanceOf: ', get(mk_balance_key(owner)).to_int()])
     return get(mk_balance_key(owner)).to_int()
 
-@public
+@public(safe=True)
 def tokensOf(owner: UInt160) -> Iterator:
     """
     Get all of the token ids owned by the specified address
@@ -221,7 +221,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     context = get_context()
     return find(mk_account_key(owner), context, flags)
 
-@public
+@public(safe=True)
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     """
     Transfers the token with id tokenId to address to
@@ -284,7 +284,7 @@ def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], t
             call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
             pass
 
-@public
+@public(safe=True)
 def ownerOf(tokenId: bytes) -> UInt160:
     """
     Get the owner of the specified token.
@@ -300,7 +300,7 @@ def ownerOf(tokenId: bytes) -> UInt160:
     debug(['ownerOf: ', owner])
     return owner
 
-@public
+@public(safe=True)
 def tokens() -> Iterator:
     """
     Get all tokens minted by the contract
@@ -311,7 +311,7 @@ def tokens() -> Iterator:
     context = get_context()
     return find(TOKEN_PREFIX, context, flags)
 
-@public
+@public(safe=True)
 def properties(tokenId: bytes) -> Dict[str, str]:
     """
     Get the properties of a token.
@@ -329,7 +329,7 @@ def properties(tokenId: bytes) -> Dict[str, str]:
 
     return metaObject
 
-@public
+@public(safe=True)
 def propertiesJson(tokenId: bytes) -> bytes:
     """
     Get the properties of a token.
@@ -573,7 +573,7 @@ def withdrawFee(account: UInt160) -> bool:
     status: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
     return status
 
-@public
+@public(safe=True)
 def getFeeBalance() -> Any:
     """
     Get mint fees balance.
@@ -584,7 +584,7 @@ def getFeeBalance() -> Any:
     debug(['getFeeBalance: ', balance])
     return balance
 
-@public
+@public(safe=True)
 def getMintFee() -> int:
     """
     Get configured mint fees value.
@@ -609,7 +609,7 @@ def setMintFee(fee: int):
     set_mint_fee(fee)
     on_update_mint_fee(calling_script_hash, fee)
 
-@public
+@public(safe=True)
 def getLockedContentViewCount(tokenId: bytes) -> int:
     """
     Get lock content view count of a token.
@@ -643,7 +643,7 @@ def getLockedContent(tokenId: bytes) -> bytes:
     on_unlock(tokenId, counter)
     return content
 
-@public
+@public(safe=True)
 def getAuthorizedAddress() -> list[UInt160]:
     """
     Configure authorized addresses.
@@ -775,7 +775,7 @@ def verify() -> bool:
     debug(["Verification failed", addr])
     return False
 
-@public
+@public(safe=True)
 def isWhitelisted() -> bool:
     """
     Check if the address is allowed to mint without fees.
@@ -794,7 +794,7 @@ def isWhitelisted() -> bool:
     debug(["Verification failed", addr])
     return False
 
-@public
+@public(safe=True)
 def isPaused() -> bool:
     """
     Get the contract pause status.
