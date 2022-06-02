@@ -479,7 +479,7 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
     assert not isPaused(), "GhostMarket contract is currently paused"
 
     fee = get_mint_fee()
-    assert fee > 0, "Mint fee can't be < 0"
+    assert fee >= 0, "Mint fee can't be < 0"
     assert check_witness(account), "Invalid witness" 
 
     if fee > 0:
