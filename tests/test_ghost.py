@@ -9,7 +9,7 @@ from boa3.constants import GAS_SCRIPT
 from boa3.neo.vm.type.String import String
 from boa3.boa3 import Boa3
 from boa3.neo import to_script_hash, to_hex_str, from_hex_str
-from boa3.builtin.type import UInt160
+from boa3.builtin.type import UInt160, ByteString
 from boa3.builtin.interop.iterator import Iterator
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
 from boa3.neo.core.types.InteropInterface import InteropInterface
@@ -25,13 +25,13 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/onblock/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
+    TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-    TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}' , 'utf-8')
+    TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}', 'utf-8')
     LOCK_CONTENT = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
     CONTRACT = UInt160()
@@ -57,8 +57,8 @@ class GhostTest(BoaTest):
                                          signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
         storage = engine.storage.to_json()
-        for i in range(0, len(storage)):
-            print(storage[i])
+        #for i in range(0, len(storage)):
+        #    print(storage[i])
         #self.assertEqual(VoidType, result)
 
     def prepare_testengine(self, preprocess=False) -> TestEngine:
@@ -245,7 +245,7 @@ class GhostTest(BoaTest):
         # should fail because contract is paused
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                     signer_accounts=[aux_address],
                     expected_result_type=bytes)
 
@@ -256,7 +256,7 @@ class GhostTest(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
             signer_accounts=[aux_address],
             expected_result_type=bytes)
         self.print_notif(engine.notifications)
@@ -266,53 +266,54 @@ class GhostTest(BoaTest):
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
+        # output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
+        # ghost_address = hash160(output)
+        # print(to_hex_str(ghost_address))
         output, manifest = self.compile_and_save(aux_path)
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
+        print(to_hex_str(GAS_SCRIPT))
 
         # should fail because account does not have enough for fees
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                # aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
-                aux_address, bytes(0), bytes(0), bytes(0), None,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
+        # with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
+        #     self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
+        #         # aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
+        #         aux_address, bytes(0), bytes(0), bytes(0),
+        #         signer_accounts=[aux_address],
+        #         expected_result_type=bytes)
 
         # add some gas for fees
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
         # should succeed now that account has enough fees
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
+                signer_accounts=[aux_address], expected_result_type=int)
 
+        print("token: " + str(token))
         print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token, expected_result_type=bytes)
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token, expected_result_type=ByteString)
         print("props: " + str(properties))
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
+        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=ByteString)
         print("royalties: " + str(royalties))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
             properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson',
-                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=bytes)
+                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=ByteString)
         print("props: " + str(properties))
 
         # check balances after
-        ghost_amount_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
-        gas_aux_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', aux_address)
-        print("ghost gas amount: " + str(ghost_amount_after))
-        print("aux gas amount: " + str(gas_aux_after))
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        print("balance nft: " + str(ghost_balance_after))
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        print("supply nft: " + str(ghost_supply_after))
-        self.assertEqual(1, ghost_supply_after)
+        # ghost_amount_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
+        # gas_aux_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', aux_address)
+        # print("ghost gas amount: " + str(ghost_amount_after))
+        # print("aux gas amount: " + str(gas_aux_after))
+        # ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
+        # print("balance nft: " + str(ghost_balance_after))
+        # ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
+        # print("supply nft: " + str(ghost_supply_after))
+        # self.assertEqual(1, ghost_supply_after)
         self.print_notif(engine.notifications)
 
     def test_ghost_gas_cost(self):
@@ -329,8 +330,8 @@ class GhostTest(BoaTest):
         engine.add_gas(aux_address, add_amount)
 
         # mint token with no meta, no lock content, no royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, bytes(1), bytes(0), bytes(0), None,
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
+            aux_address, bytes(1), bytes(0), bytes(0),
             signer_accounts=[aux_address],
             expected_result_type=bytes)
 
@@ -338,8 +339,8 @@ class GhostTest(BoaTest):
         print("token with no meta, no lock content, no royalties: " + gasConsumed + " GAS")
 
         # mint token with meta, no lock content, no royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, bytes(0), bytes(0), None,
+        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
+            aux_address, self.TOKEN_META, bytes(0), bytes(0),
             signer_accounts=[aux_address],
             expected_result_type=bytes)
 
@@ -348,7 +349,7 @@ class GhostTest(BoaTest):
 
         # mint token with meta, lock content, no royalties
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, bytes(0), None,
+            aux_address, self.TOKEN_META, self.LOCK_CONTENT, bytes(0),
             signer_accounts=[aux_address],
             expected_result_type=bytes)
 
@@ -357,7 +358,7 @@ class GhostTest(BoaTest):
 
         # mint token with meta, no lock content, royalties
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, bytes(0), self.ROYALTIES, None,
+            aux_address, self.TOKEN_META, bytes(0), self.ROYALTIES,
             signer_accounts=[aux_address],
             expected_result_type=bytes)
 
@@ -366,7 +367,7 @@ class GhostTest(BoaTest):
 
         # mint token with meta, lock content, royalties
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
             signer_accounts=[aux_address],
             expected_result_type=bytes)
 
@@ -381,7 +382,7 @@ class GhostTest(BoaTest):
 
         # mint high end token
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, tokenMeta, lockedContent, royalties, None,
+            aux_address, tokenMeta, lockedContent, royalties,
             signer_accounts=[aux_address],
             expected_result_type=bytes)
             
@@ -443,7 +444,7 @@ class GhostTest(BoaTest):
         print("mint now")
         # multiMint
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
-                aux_address, tokenMeta, lockedContent, royalties, None,
+                aux_address, tokenMeta, lockedContent, royalties,
                 signer_accounts=[aux_address],
                 expected_result_type=list)
         print("result: " + str(result))
@@ -475,7 +476,7 @@ class GhostTest(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META_2, self.LOCK_CONTENT, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META_2, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
@@ -503,7 +504,7 @@ class GhostTest(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
         properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token)
@@ -567,7 +568,7 @@ class GhostTest(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
@@ -619,7 +620,7 @@ class GhostTest(BoaTest):
 
         # multiMint
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
-                aux_address, tokenMeta, lockedContent, royalties, None,
+                aux_address, tokenMeta, lockedContent, royalties,
                 signer_accounts=[aux_address],
                 expected_result_type=list)
 
@@ -657,7 +658,7 @@ class GhostTest(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
             signer_accounts=[self.OTHER_ACCOUNT_1],
             expected_result_type=bytes)
 
@@ -740,9 +741,8 @@ class GhostTest(BoaTest):
 
         # mint + balanceOf
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
-                signer_accounts=[self.OTHER_ACCOUNT_1],
-                expected_result_type=bytes)
+                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
+                signer_accounts=[self.OTHER_ACCOUNT_1], expected_result_type=ByteString)
         balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
@@ -756,7 +756,7 @@ class GhostTest(BoaTest):
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[self.OTHER_ACCOUNT_1],
                 expected_result_type=bytes)
         balance_after_updated = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
@@ -797,7 +797,7 @@ class GhostTest(BoaTest):
 
         # mint + getLockedContentViewCount
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES, None,
+                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[self.OTHER_ACCOUNT_1],
                 expected_result_type=bytes)
         views = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContentViewCount', token,
