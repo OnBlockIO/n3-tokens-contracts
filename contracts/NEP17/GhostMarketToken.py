@@ -10,11 +10,9 @@ from boa3.builtin.interop.stdlib import serialize, deserialize, base58_encode
 from boa3.builtin.type import UInt160
 
 
-
 # -------------------------------------------
 # METADATA
 # -------------------------------------------
-
 @metadata
 def manifest_metadata() -> NeoMetadata:
     """
@@ -25,15 +23,13 @@ def manifest_metadata() -> NeoMetadata:
     meta.description = "GhostMarket GM NEP17 contract"
     meta.email = "hello@ghostmarket.io"
     meta.supported_standards = ["NEP-17"]
-    meta.permissions = [{"contract": "*","methods": "*"}]
     return meta
-
 
 # -------------------------------------------
 # TOKEN SETTINGS
 # -------------------------------------------
 
-#
+
 AUTH_ADDRESSES = b'AU'
 
 # Supply of the token
@@ -71,7 +67,8 @@ on_auth = CreateNewEvent(
     'Authorized'
 )
 
-#DEBUG_START
+
+# DEBUG_START
 # -------------------------------------------
 # DEBUG
 # -------------------------------------------
@@ -82,14 +79,14 @@ debug = CreateNewEvent(
     ],
     'Debug'
 )
-#DEBUG_END
+# DEBUG_END
 
 
 # -------------------------------------------
 # NEP-17 Methods
 # -------------------------------------------
 
-@public
+@public(safe=True)
 def symbol() -> str:
     """
     Gets the symbols of the token.
@@ -103,7 +100,7 @@ def symbol() -> str:
     return TOKEN_SYMBOL
 
 
-@public
+@public(safe=True)
 def decimals() -> int:
     """
     Gets the amount of decimals used by the token.
@@ -116,7 +113,7 @@ def decimals() -> int:
     return TOKEN_DECIMALS
 
 
-@public
+@public(safe=True)
 def totalSupply() -> int:
     """
     Gets the total token supply deployed in the system.
@@ -129,7 +126,7 @@ def totalSupply() -> int:
     return get(SUPPLY_KEY).to_int()
 
 
-@public
+@public(safe=True)
 def balanceOf(account: UInt160) -> int:
     """
     Get the current balance of an address
@@ -139,7 +136,7 @@ def balanceOf(account: UInt160) -> int:
     :param account: the account address to retrieve the balance for
     :type account: UInt160
     """
-    assert len(account) == 20
+    assert validateAddress(account), "invalid address"
     debug([account])
     return get(account).to_int()
 
@@ -164,8 +161,8 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     :return: whether the transfer was successful
     :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
     """
-    # the parameters from and to should be 20-byte addresses. If not, this method should throw an exception.
-    assert len(from_address) == 20 and len(to_address) == 20
+    assert validateAddress(from_address), "invalid from address"
+    assert validateAddress(to_address), "invalid to address"
     # contract should not be paused
     assert not isPaused(), "GhostMarket contract is currently paused"
     # the parameter amount must be greater than or equal to 0. If not, this method should throw an exception.
@@ -179,9 +176,8 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     # The function should check whether the from address equals the caller contract hash.
     # If so, the transfer should be processed;
     # If not, the function should use the check_witness to verify the transfer.
-    if from_address != calling_script_hash:
-        if not check_witness(from_address):
-            return False
+    if not check_witness(from_address):
+        return False
 
     # skip balance changes if transferring to yourself or transferring 0 cryptocurrency
     if from_address != to_address and amount != 0:
@@ -214,10 +210,11 @@ def post_transfer(from_address: Union[UInt160, None], to_address: Union[UInt160,
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
-    if not isinstance(to_address, None):    # TODO: change to 'is not None' when `is` semantic is implemented
+    if not isinstance(to_address, None):
         contract = get_contract(to_address)
-        if not isinstance(contract, None):      # TODO: change to 'is not None' when `is` semantic is implemented
+        if not isinstance(contract, None):
             call_contract(to_address, 'onNEP17Payment', [from_address, amount, data])
+
 
 @public
 def _deploy(data: Any, upgrade: bool):
@@ -235,10 +232,6 @@ def _deploy(data: Any, upgrade: bool):
 
     tx = cast(Transaction, script_container)
     owner: UInt160 = tx.sender
-    internal_deploy(owner)
-
-
-def internal_deploy(owner: UInt160):
 
     put(DEPLOYED, True)
     put(PAUSED, False)
@@ -252,6 +245,7 @@ def internal_deploy(owner: UInt160):
 
     on_transfer(None, owner, TOKEN_TOTAL_SUPPLY)
     post_transfer(None, owner, TOKEN_TOTAL_SUPPLY, None)
+
 
 @public
 def update(script: bytes, manifest: bytes):
@@ -268,42 +262,12 @@ def update(script: bytes, manifest: bytes):
     update_contract(script, manifest) 
     debug(['update called and done'])
 
-@public
-def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
-    """
-    Abort on NEP17 transfers to the contract.
-
-    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
-    :type amount: int
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    abort()
-
-@public
-def onNEP11Payment(from_address: UInt160, amount: int, tokenId: bytes, data: Any):
-    """
-    Abort on NEP11 transfers to the contract.
-
-    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
-    :type amount: int
-    :param token: the token hash as bytes
-    :type token: bytes
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    abort()
-
 
 # -------------------------------------------
 # GhostMarket Methods
 # -------------------------------------------
 
-@public
+@public(safe=True)
 def getAuthorizedAddress() -> list[UInt160]:
     """
     Configure authorized addresses.
@@ -324,6 +288,7 @@ def getAuthorizedAddress() -> list[UInt160]:
 
     return auth
 
+
 @public
 def setAuthorizedAddress(address: UInt160, authorized: bool):
     """
@@ -341,6 +306,7 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
+    assert validateAddress(address), "invalid address in set auth"
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -349,6 +315,7 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
         for i in auth:
             if i == address:
                 found = True
+                break
 
         if not found:
             auth.append(address)
@@ -360,7 +327,8 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
         put(AUTH_ADDRESSES, serialize(auth))
         on_auth(address, 0, False)
 
-@public
+
+@public(safe=True)
 def isPaused() -> bool:
     """
     Get the contract pause status.
@@ -373,6 +341,7 @@ def isPaused() -> bool:
     if get(PAUSED).to_bool():
         return True
     return False
+
 
 @public
 def updatePause(status: bool) -> bool:
@@ -389,7 +358,7 @@ def updatePause(status: bool) -> bool:
     debug(['updatePause: ', get(PAUSED).to_bool()])
     return get(PAUSED).to_bool() 
 
-@public
+
 def verify() -> bool:
     """
     Check if the address is allowed.
@@ -410,3 +379,11 @@ def verify() -> bool:
 
     debug(["Verification failed", addr])
     return False
+
+
+def validateAddress(address: UInt160) -> bool:
+    if not isinstance(address, UInt160):
+        return False
+    if address == 0:
+        return False
+    return True
