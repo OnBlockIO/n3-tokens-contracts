@@ -1,4 +1,3 @@
-import os
 from typing import Dict
 from pathlib import Path
 from boa3_test.tests.boa_test import BoaTest
@@ -6,13 +5,9 @@ from boa3_test.tests.test_classes.testengine import TestEngine
 from boa3.neo.smart_contract.VoidType import VoidType
 from boa3.neo.cryptography import hash160
 from boa3.constants import GAS_SCRIPT
-from boa3.neo.vm.type.String import String
-from boa3.boa3 import Boa3
-from boa3.neo import to_script_hash, to_hex_str, from_hex_str
+from boa3.neo import to_script_hash, to_hex_str
 from boa3.builtin.type import UInt160, ByteString
-from boa3.builtin.interop.iterator import Iterator
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
-from boa3.neo.core.types.InteropInterface import InteropInterface
 from boa3_test.tests.test_classes.testcontract import TestContract
 
 
