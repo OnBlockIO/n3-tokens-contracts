@@ -1,17 +1,16 @@
-from typing import Any, Dict, List, Union, cast, MutableSequence
+from typing import Any, Dict, List, Union, cast
 
 from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
-from boa3.builtin.contract import Nep17TransferEvent, abort
+from boa3.builtin.contract import abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
-from boa3.builtin.interop.contract import NEO, GAS, call_contract, destroy_contract, update_contract, CallFlags
-from boa3.builtin.interop.runtime import notify, log, calling_script_hash, executing_script_hash, check_witness, script_container
-from boa3.builtin.interop.stdlib import serialize, deserialize, base58_encode
-from boa3.builtin.interop.storage import delete, get, put, find, get_context, get_read_only_context
+from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract, CallFlags
+from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container
+from boa3.builtin.interop.stdlib import serialize, deserialize
+from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
-from boa3.builtin.interop.crypto import ripemd160, sha256
-from boa3.builtin.type import UInt160, UInt256, ByteString
-from boa3.builtin.interop.json import json_serialize, json_deserialize
+from boa3.builtin.type import UInt160, ByteString
+from boa3.builtin.interop.json import json_deserialize
 from boa3.builtin.interop.runtime import get_network
 
 
@@ -29,8 +28,8 @@ def manifest_metadata() -> NeoMetadata:
     meta.description = "GhostMarket NFT"
     meta.email = "hello@ghostmarket.io"
     meta.supported_standards = ["NEP-11"]
-    # meta.add_permission(contract="*", methods=["*"])
-    # meta.add_trusted_source("*")
+    meta.source = ["https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP11/GhostMarket.NFT.py"]
+    # meta.add_permission(contract='*', methods='*')
     return meta
 
 
@@ -535,7 +534,6 @@ def mintWhitelisted(account: UInt160, meta: ByteString, lockedContent: ByteStrin
     assert not isPaused(), "GhostMarket contract is currently paused"
     assert isWhitelisted(), '`account` is not whitelisted for mintWhitelisted'
 
-    # TODO what about royalties handling with mintWhitelisted()
     return internal_mint(account, meta, lockedContent, royalties)
 
 @public(safe=True)
@@ -689,6 +687,8 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
+    assert validateAddress(address), "Not a valid address"
+    assert isinstance(authorized, bool), "authorized has to be of type bool"
     serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -727,6 +727,8 @@ def setWhitelistedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     assert verify(), '`acccount` is not allowed for setWhitelistedAddress'
+    assert validateAddress(address), "Not a valid address"
+    assert isinstance(authorized, bool), "authorized has to be of type bool"
     serialized = get(WL_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -986,7 +988,7 @@ def remove_meta(tokenId: ByteString):
 
 def add_meta(tokenId: ByteString, meta: ByteString):
     key = mk_meta_key(tokenId)
-    # debug(['add_meta: ', key, tokenId])
+    debug(['add_meta: ', key, tokenId])
     put(key, meta)
 
 
