@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import logging
-from pathlib import Path
 
 from boa3.boa3 import Boa3
-from boa3.builtin.type import UInt160
-from boa3.neo.cryptography import hash160
 
 from contextlib import contextmanager
 import sys, os
