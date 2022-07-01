@@ -23,6 +23,7 @@ class TestNEP17(BoaTest):
     CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarketToken.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
+    # TODO add .env file and move test engine path there
     TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')

@@ -56,8 +56,8 @@ def build_contract(path):
 
 GHOST_ROOT = str(os.getcwd())
 to_remove = ['debug(']
-debug_block_start = ['#DEBUG_START']
-debug_block_end = ['#DEBUG_END']
+debug_block_start = ['# DEBUG_START']
+debug_block_end = ['# DEBUG_END']
 
 CONTRACT_DIR = GHOST_ROOT + '/contracts/NEP11/'
 CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
