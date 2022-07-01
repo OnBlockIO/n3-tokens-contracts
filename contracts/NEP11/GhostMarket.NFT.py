@@ -1057,7 +1057,6 @@ def get_mint_fee() -> int:
 
 # helpers
 
-@public
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
         return False
