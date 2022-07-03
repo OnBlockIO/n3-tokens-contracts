@@ -276,8 +276,8 @@ def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], t
     :type token_owner: UInt160
     :param to: the address of the receiver
     :type to: UInt160
-    :param tokenId: the token hash asByteString 
-    :type tokenId:ByteString 
+    :param tokenId: the token hash as ByteString 
+    :type tokenId: ByteString 
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
@@ -465,13 +465,11 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta:ByteString 
+    :type meta: ByteString 
     :param lockedContent: the lock content to use for this token
-    :type lockedContent:ByteString 
+    :type lockedContent: ByteString 
     :param royalties: the royalties to use for this token
-    :type royalties:ByteString 
-    :param data: whatever data is pertinent to the mint method
-    :type data: Any
+    :type royalties: ByteString 
     :return: tokenId of the token minted
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it or if the contract is paused or if check witness fails.
     """
@@ -497,11 +495,11 @@ def multiMint(account: UInt160, meta: List[ByteString], lockedContent: List[Byte
     :param account: the address of the account that is minting tokens
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta:ByteString 
+    :type meta: ByteString 
     :param lockedContent: the lock content to use for this token
-    :type lockedContent:ByteString 
+    :type lockedContent: ByteString 
     :param royalties: the royalties to use for this token
-    :type royalties:ByteString 
+    :type royalties: ByteString 
     :return: list of tokenId of the tokens minted
     :raise AssertionError: raised if royalties or lockContent or meta is not a list
     """
@@ -523,11 +521,11 @@ def mintWhitelisted(account: UInt160, meta: ByteString, lockedContent: ByteStrin
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: bytes
+    :type meta: ByteString
     :param lockedContent: the lock content to use for this token
-    :type lockedContent: bytes
+    :type lockedContent: ByteString
     :param royalties: the royalties to use for this token
-    :type royalties: bytes
+    :type royalties: ByteString
     :return: tokenId of the token minted
     :raise AssertionError: raised if address is not whitelisted or if contract is paused
     """
@@ -543,7 +541,7 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
 
     :param tokenId: the token to get royalties values
     :type tokenId: ByteString
-    :return: bytes of addresses and values for this token royalties.
+    :return: ByteString of addresses and values for this token royalties.
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     royalties = get_royalties(tokenId)
@@ -830,9 +828,9 @@ def update(script: bytes, manifest: bytes):
     Upgrade the contract.
 
     :param script: the contract script
-    :type script:ByteString 
+    :type script: ByteString 
     :param manifest: the contract manifest
-    :type manifest:ByteString 
+    :type manifest: ByteString 
     :raise AssertionError: raised if witness is not verified
     """
     assert verify(), '`acccount` is not allowed for update'
@@ -885,11 +883,11 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta:ByteString 
+    :type meta: ByteString 
     :param lockedContent: the lock content to use for this token
-    :type lockedContent:ByteString 
+    :type lockedContent: ByteString 
     :param royalties: the royalties to use for this token
-    :type royalties:ByteString 
+    :type royalties: ByteString 
     :return: tokenId of the token minted
     :raise AssertionError: raised if meta is empty, or if contract is paused.
     """
