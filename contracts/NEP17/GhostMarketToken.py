@@ -138,7 +138,7 @@ def balanceOf(account: UInt160) -> int:
     :param account: the account address to retrieve the balance for
     :type account: UInt160
     """
-    assert validateAddress(account), "invalid address"
+    expect(validateAddress(account), "invalid address")
     debug([account])
     return get(account).to_int()
 
@@ -163,12 +163,12 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     :return: whether the transfer was successful
     :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
     """
-    assert validateAddress(from_address), "invalid from address"
-    assert validateAddress(to_address), "invalid to address"
+    expect(validateAddress(from_address), "invalid from address")
+    expect(validateAddress(to_address), "invalid to address")
     # contract should not be paused
-    assert not isPaused(), "GhostMarket contract is currently paused"
+    expect(not isPaused(), "GhostMarket contract is currently paused")
     # the parameter amount must be greater than or equal to 0. If not, this method should throw an exception.
-    assert amount >= 0
+    expect(amount >= 0, "amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
     from_balance = get(from_address).to_int()
@@ -260,7 +260,8 @@ def update(script: bytes, manifest: bytes):
     :type manifest: bytes
     :raise AssertionError: raised if witness is not verified
     """
-    assert verify(), '`acccount` is not allowed for update'
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for update')
     update_contract(script, manifest) 
     debug(['update called and done'])
 
@@ -307,9 +308,10 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :return: whether the transaction signature is correct
     :raise AssertionError: raised if witness is not verified.
     """
-    assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
-    assert validateAddress(address), "invalid address in set auth"
-    assert isinstance(authorized, bool), "authorized has to be of type bool"
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for setAuthorizedAddress')
+    expect(validateAddress(address), "invalid address in set auth")
+    expect(isinstance(authorized, bool), "authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -356,8 +358,9 @@ def updatePause(status: bool) -> bool:
     :return: the contract pause status
     :raise AssertionError: raised if witness is not verified.
     """
-    assert verify(), '`acccount` is not allowed for updatePause'
-    assert isinstance(status, bool), "status has to be of type bool"
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for updatePause')
+    expect(isinstance(status, bool), "status has to be of type bool")
     put(PAUSED, status)
     debug(['updatePause: ', get(PAUSED).to_bool()])
     return get(PAUSED).to_bool() 
@@ -384,6 +387,13 @@ def verify() -> bool:
     debug(["Verification failed", addr])
     return False
 
+# helpers
+
+def expect(condition: bool, message: str):
+    # TODO: Add assert message back after PR #737 is fixed
+    # https://github.com/neo-project/neo-modules/pull/737
+    # assert condition, message
+    assert condition
 
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
