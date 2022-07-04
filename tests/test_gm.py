@@ -15,7 +15,7 @@ from boa3.neo.core.types.InteropInterface import InteropInterface
 
 CONTRACT_BUILT = False
 
-class TestNEP17(BoaTest):
+class GhostTest(BoaTest):
     p = Path(__file__)
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
