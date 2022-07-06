@@ -107,7 +107,7 @@ class GhostTest(BoaTest):
                                          expected_result_type=bool)
         self.assertEqual(True, result)
 
-        # initiate a transfer from of 500
+        # initiate a transfer of 500
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transferFrom',
                                         self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_2, amount, None,
                                         signer_accounts=[self.OTHER_ACCOUNT_1],
