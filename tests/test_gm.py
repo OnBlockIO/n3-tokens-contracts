@@ -73,7 +73,7 @@ class GhostTest(BoaTest):
 
     def test_gm_allowance(self):
         approval = 1_000
-        amount = 500
+        transferred_amount = 500
         
         engine = self.prepare_testengine()
 
@@ -93,6 +93,19 @@ class GhostTest(BoaTest):
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
                                         self.OTHER_ACCOUNT_1, approval,
                                         signer_accounts=[self.OWNER_SCRIPT_HASH])
+        self.assertEqual(True, result)
+        transfer_events = engine.get_events('Approval')
+        self.assertEqual(1, len(transfer_events))
+        self.assertEqual(3, len(transfer_events[0].arguments))
+
+        owner, spender, amount = transfer_events[0].arguments
+        if isinstance(owner, str):
+            owner = String(owner).to_bytes()
+        if isinstance(spender, str):
+            spender = String(spender).to_bytes()
+        self.assertEqual(self.OWNER_SCRIPT_HASH, owner)
+        self.assertEqual(self.OTHER_ACCOUNT_1, spender)
+        self.assertEqual(approval, amount)
 
         # should now have allowance of 1000
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
@@ -102,14 +115,14 @@ class GhostTest(BoaTest):
 
         # transfer from deployer to owner
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.DEPLOYER_ACCOUNT, self.OWNER_SCRIPT_HASH, amount, None,
+                                         self.DEPLOYER_ACCOUNT, self.OWNER_SCRIPT_HASH, transferred_amount, None,
                                          signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
         self.assertEqual(True, result)
 
         # initiate a transfer of 500
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transferFrom',
-                                        self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_2, amount, None,
+                                        self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_2, transferred_amount, None,
                                         signer_accounts=[self.OTHER_ACCOUNT_1],
                                         expected_result_type=bool)
         self.assertEqual(True, result)
@@ -124,7 +137,7 @@ class GhostTest(BoaTest):
             receiver = String(receiver).to_bytes()
         self.assertEqual(self.OWNER_SCRIPT_HASH, sender)
         self.assertEqual(self.OTHER_ACCOUNT_2, receiver)
-        self.assertEqual(amount, amount)
+        self.assertEqual(transferred_amount, amount)
 
         # should now have allowance of 500
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
