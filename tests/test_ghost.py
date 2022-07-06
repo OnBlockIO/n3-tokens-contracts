@@ -20,7 +20,7 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
+    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))

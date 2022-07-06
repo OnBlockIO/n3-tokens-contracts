@@ -5,9 +5,9 @@ from boa3.builtin.contract import Nep17TransferEvent, abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import call_contract, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
-from boa3.builtin.interop.storage import delete, get, put
+from boa3.builtin.interop.storage import delete, get, put, get_read_only_context
 from boa3.builtin.interop.stdlib import serialize, deserialize
-from boa3.builtin.type import UInt160
+from boa3.builtin.type import UInt160, ByteString
 
 
 # -------------------------------------------
@@ -22,7 +22,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Vincent Geneste, Mathias Enzensberger"
     meta.description = "GhostMarket GM NEP17 contract"
     meta.email = "hello@ghostmarket.io"
-    meta.supported_standards = ["NEP-17"]
+    meta.supported_standards = ["NEP-17", "NEP-17.1"]
     meta.source = ["https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP17/GhostMarketToken.py"]
     # meta.add_permission(contract='*', methods='*')
     return meta
@@ -32,6 +32,7 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 
 
+# Authorized address prefix
 AUTH_ADDRESSES = b'AU'
 
 # Supply of the token
@@ -52,6 +53,9 @@ DEPLOYED = b'deployed'
 # Whether the smart contract is paused or not
 PAUSED = b'paused'
 
+# Allowance prefix
+ALLOWANCE_PREFIX = b'ALL'
+
 
 # -------------------------------------------
 # Events
@@ -67,6 +71,16 @@ on_auth = CreateNewEvent(
         ('add', bool),
     ],
     'Authorized'
+)
+
+on_approve = CreateNewEvent(
+    # trigger when an approval has been made
+    [
+        ('owner', UInt160),
+        ('spender', UInt160),
+        ('amount', int),
+    ],
+    'Approval'
 )
 
 
@@ -141,6 +155,126 @@ def balanceOf(account: UInt160) -> int:
     expect(validateAddress(account), "invalid address")
     debug([account])
     return get(account).to_int()
+
+@public(safe=True)
+def allowance(owner: UInt160, spender: UInt160) -> int:
+    """
+    Returns the remaining number of tokens that spender will be allowed to spend on behalf
+    of owner through transferFrom. This is zero by default.
+
+    This value changes when approve or transferFrom are called.
+
+    :param owner: the address to check approval for
+    :type owner: UInt160
+    :param spender: the address allowed to spend on behalf of the owner
+    :type spender: UInt160
+    
+    :return: the number of tokens allowed to be spent.
+    """
+    expect(validateAddress(owner), "invalid owner address")
+    expect(validateAddress(spender), "invalid spender address")
+    all = get(mk_allowance_key(owner, spender), get_read_only_context()).to_int()
+    debug(['allowance: ', all])
+    return all
+
+@public
+def approve(spender: UInt160, amount: int) -> bool:
+    """
+    Sets amount as the allowance of spender over the caller’s tokens.
+
+    Returns a boolean value indicating whether the operation succeeded.
+
+    :param spender: the address to allow as a spender
+    :type spender: UInt160
+    :param amount: the amount of tokens to allow to spend
+    :type amount: int
+    
+    :return: bool value of operation success.
+    """
+    expect(validateAddress(spender), "invalid spender address")
+    expect(amount >= 0, "amount has to be >= 0")
+    # contract should not be paused
+    expect(not isPaused(), "GhostMarket contract is currently paused")
+    tx = cast(Transaction, script_container)
+    owner = tx.sender
+    expect(check_witness(owner),"Invalid witness" )
+
+    if amount == 0:
+        remove_allowance(owner, spender)
+    else:
+        set_allowance(owner, spender, amount)
+
+    on_approve(owner, spender, amount)
+    return True
+
+@public
+def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, amount: int, data: Any) -> bool:
+    """
+    Transfers an amount of NEP17 tokens from one account to another using the allowance mechanism.
+
+    If the method succeeds, it must fire the `Transfer` event and must return true, even if the amount is 0,
+    or from and to are the same address.
+
+    :param spender: the address transferring
+    :type spender: UInt160
+    :param from_address: the address to transfer from
+    :type from_address: UInt160
+    :param to_address: the address to transfer to
+    :type to_address: UInt160
+    :param amount: the amount of NEP17 tokens to transfer
+    :type amount: int
+    :param data: whatever data is pertinent to the onPayment method
+    :type data: Any
+
+    :return: whether the transfer was successful
+    :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
+    """
+    expect(validateAddress(spender), "invalid spender address")
+    expect(validateAddress(from_address), "invalid from address")
+    expect(validateAddress(to_address), "invalid to address")
+    # contract should not be paused
+    expect(not isPaused(), "GhostMarket contract is currently paused")
+    # the parameter amount must be greater than or equal to 0. If not, this method should throw an exception.
+    expect(amount >= 0, "amount must be greater than or equal to 0")
+
+    # The function MUST return false if the from account balance does not have enough tokens to spend.
+    from_balance = get(from_address).to_int()
+    if from_balance < amount:
+        return False
+
+    # The function should check whether the from address equals the caller contract hash.
+    # If so, the transfer should be processed;
+    # If not, the function should use the check_witness to verify the transfer.
+    if not check_witness(from_address) and not check_witness(spender):
+        return False
+
+    # allowance should be > amount
+    all = get(mk_allowance_key(from_address, spender), get_read_only_context()).to_int()
+    expect(amount <= all, "spender allowance exceeded")
+
+    # update new allowance
+    if all == amount:
+        remove_allowance(from_address, spender)
+    else: 
+        newAllowance = all - amount
+        set_allowance(from_address, spender, newAllowance)
+
+    # skip balance changes if transferring to yourself or transferring 0 cryptocurrency
+    if from_address != to_address and amount != 0:
+        if from_balance == amount:
+            delete(from_address)
+        else:
+            put(from_address, from_balance - amount)
+
+        to_balance = get(to_address).to_int()
+        put(to_address, to_balance + amount)
+
+    # if the method succeeds, it must fire the transfer event
+    on_transfer(from_address, to_address, amount)
+    # if the to_address is a smart contract, it must call the contracts onPayment
+    post_transfer(from_address, to_address, amount, data)
+    # and then it must return true
+    return True
 
 
 @public
@@ -401,3 +535,16 @@ def validateAddress(address: UInt160) -> bool:
     if address == 0:
         return False
     return True
+
+def remove_allowance(owner: UInt160, spender: UInt160):
+    key = mk_allowance_key(owner, spender)
+    debug(['remove_allowance: ', key, owner, spender])
+    delete(key)
+
+def set_allowance(owner: UInt160, spender: UInt160, amount: int):
+    key = mk_allowance_key(owner, spender)
+    debug(['set_allowance: ', key, owner, spender])
+    put(key, amount)
+
+def mk_allowance_key(owner: UInt160, spender: UInt160) -> ByteString:
+    return ALLOWANCE_PREFIX + owner + spender

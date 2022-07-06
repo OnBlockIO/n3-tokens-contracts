@@ -24,7 +24,7 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
+    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
@@ -70,6 +70,67 @@ class GhostTest(BoaTest):
         engine = self.prepare_testengine()
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
         self.assertEqual(total_supply, result)
+
+    def test_gm_allowance(self):
+        approval = 1_000
+        amount = 500
+        
+        engine = self.prepare_testengine()
+
+        # should have allowance of 0 by default
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
+                                        self.DEPLOYER_ACCOUNT, self.OTHER_ACCOUNT_1,
+                                        expected_result_type=int)
+        self.assertEqual(0, result)
+
+        # should fail when the approve is less than 0
+        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
+            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
+                                    self.OTHER_ACCOUNT_1, -10,
+                                    signer_accounts=[self.OWNER_SCRIPT_HASH])
+
+        # set an approval for 1000
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
+                                        self.OTHER_ACCOUNT_1, approval,
+                                        signer_accounts=[self.OWNER_SCRIPT_HASH])
+
+        # should now have allowance of 1000
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
+                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1,
+                                        expected_result_type=int)
+        self.assertEqual(approval, result)
+
+        # transfer from deployer to owner
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
+                                         self.DEPLOYER_ACCOUNT, self.OWNER_SCRIPT_HASH, amount, None,
+                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
+                                         expected_result_type=bool)
+        self.assertEqual(True, result)
+
+        # initiate a transfer from of 500
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transferFrom',
+                                        self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_2, amount, None,
+                                        signer_accounts=[self.OTHER_ACCOUNT_1],
+                                        expected_result_type=bool)
+        self.assertEqual(True, result)
+        transfer_events = engine.get_events('Transfer')
+        self.assertEqual(3, len(transfer_events))
+        self.assertEqual(3, len(transfer_events[2].arguments))
+
+        sender, receiver, amount = transfer_events[2].arguments
+        if isinstance(sender, str):
+            sender = String(sender).to_bytes()
+        if isinstance(receiver, str):
+            receiver = String(receiver).to_bytes()
+        self.assertEqual(self.OWNER_SCRIPT_HASH, sender)
+        self.assertEqual(self.OTHER_ACCOUNT_2, receiver)
+        self.assertEqual(amount, amount)
+
+        # should now have allowance of 500
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
+                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1,
+                                        expected_result_type=int)
+        self.assertEqual(amount, result)
 
     def test_gm_total_balance_of(self):
         total_supply = 100_000_000 * 10 ** 8
