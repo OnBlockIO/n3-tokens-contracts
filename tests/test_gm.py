@@ -86,12 +86,12 @@ class GhostTest(BoaTest):
         # should fail when the approve is less than 0
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
-                                    self.OTHER_ACCOUNT_1, -10,
+                                    self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, -10,
                                     signer_accounts=[self.OWNER_SCRIPT_HASH])
 
         # set an approval for 1000
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
-                                        self.OTHER_ACCOUNT_1, approval,
+                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, approval,
                                         signer_accounts=[self.OWNER_SCRIPT_HASH])
         self.assertEqual(True, result)
         transfer_events = engine.get_events('Approval')

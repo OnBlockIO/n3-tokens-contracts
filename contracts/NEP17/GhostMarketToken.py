@@ -157,33 +157,35 @@ def balanceOf(account: UInt160) -> int:
     return get(account).to_int()
 
 @public(safe=True)
-def allowance(owner: UInt160, spender: UInt160) -> int:
+def allowance(from_address: UInt160, spender: UInt160) -> int:
     """
     Returns the remaining number of tokens that spender will be allowed to spend on behalf
-    of owner through transferFrom. This is zero by default.
+    of from_address through transferFrom. This is zero by default.
 
     This value changes when approve or transferFrom are called.
 
-    :param owner: the address to check approval for
-    :type owner: UInt160
-    :param spender: the address allowed to spend on behalf of the owner
+    :param from_address: the address to check approval for
+    :type from_address: UInt160
+    :param spender: the address allowed to spend on behalf of the from_address
     :type spender: UInt160
     
     :return: the number of tokens allowed to be spent.
     """
-    expect(validateAddress(owner), "invalid owner address")
+    expect(validateAddress(from_address), "invalid from_address address")
     expect(validateAddress(spender), "invalid spender address")
-    all = get(mk_allowance_key(owner, spender), get_read_only_context()).to_int()
+    all = get(mk_allowance_key(from_address, spender), get_read_only_context()).to_int()
     debug(['allowance: ', all])
     return all
 
 @public
-def approve(spender: UInt160, amount: int) -> bool:
+def approve(from_address: UInt160, spender: UInt160, amount: int) -> bool:
     """
-    Sets amount as the allowance of spender over the caller’s tokens.
+    Sets amount as the allowance of spender over the from_address tokens.
 
     Returns a boolean value indicating whether the operation succeeded.
 
+    :param from_address: the address giving approval
+    :type from_address: UInt160
     :param spender: the address to allow as a spender
     :type spender: UInt160
     :param amount: the amount of tokens to allow to spend
@@ -191,20 +193,18 @@ def approve(spender: UInt160, amount: int) -> bool:
     
     :return: bool value of operation success.
     """
+    expect(check_witness(from_address),"Invalid witness" )
     expect(validateAddress(spender), "invalid spender address")
     expect(amount >= 0, "amount has to be >= 0")
     # contract should not be paused
     expect(not isPaused(), "GhostMarket contract is currently paused")
-    tx = cast(Transaction, script_container)
-    owner = tx.sender
-    expect(check_witness(owner),"Invalid witness" )
 
     if amount == 0:
-        remove_allowance(owner, spender)
+        remove_allowance(from_address, spender)
     else:
-        set_allowance(owner, spender, amount)
+        set_allowance(from_address, spender, amount)
 
-    on_approve(owner, spender, amount)
+    on_approve(from_address, spender, amount)
     return True
 
 @public
@@ -242,7 +242,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
     if from_balance < amount:
         return False
 
-    # The function should check whether the from address equals the caller contract hash.
+    # The function should check whether the from address equals the caller contract hash or the spender.
     # If so, the transfer should be processed;
     # If not, the function should use the check_witness to verify the transfer.
     if not check_witness(from_address) and not check_witness(spender):
