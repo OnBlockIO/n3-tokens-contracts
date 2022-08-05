@@ -22,7 +22,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Vincent Geneste, Mathias Enzensberger"
     meta.description = "GhostMarket GM NEP17 contract"
     meta.email = "hello@ghostmarket.io"
-    meta.supported_standards = ["NEP-17", "NEP-17.1"]
+    meta.supported_standards = ["NEP-17", "NEP-17-1"]
     meta.source = ["https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP17/GhostMarketToken.py"]
     # meta.add_permission(contract='*', methods='*')
     return meta
