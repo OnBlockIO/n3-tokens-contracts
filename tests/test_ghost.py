@@ -16,11 +16,11 @@ class GhostTest(BoaTest):
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP11/GhostMarket.NFT.manifest.json'
+    CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
+    TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % GHOST_ROOT
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
@@ -45,7 +45,7 @@ class GhostTest(BoaTest):
             self.CONTRACT = hash160(output)
 
     def deploy_contract(self, engine):
-        cc = TestContract(self.CONTRACT_PATH_NEF)
+        cc = TestContract(self.CONTRACT_PATH_NEF, self.CONTRACT_PATH_JSON)
         # engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         engine.add_signer_account(self.OWNER_SCRIPT_HASH)
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', self.OWNER_SCRIPT_HASH, False,

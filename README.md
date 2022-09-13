@@ -25,6 +25,7 @@ This contract features two methods to handle properties:
 This contract supports both methods for convenience purposes.
 
 ### Compiling contract
+
 ```
 .compile.py
 or
@@ -32,12 +33,14 @@ neo3-boa GhostMarket.NFT.py
 ```
 
 ### Deploying from neo-cli
+
 ```
 open wallet <wallet path>
 deploy <nef path> <manifest.path>
 ```
 
 ### Upgrading from neo-cli
+
 ```
 open wallet <path>
 update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
@@ -45,15 +48,16 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 
 ## Testing
 
-tests can be run with:
+Tests can be run with:
 
 ```
-test_ghost.py
+python -m unittest test_ghost
 ```
 
-individual test can be run witn  
+Individual test can be run with:
+
 ```
-python -m unittest test_ghost.GhostTest.test_ghost_decimals
+python -m unittest test_ghost.GhostTest.test_gm_decimals
 ```
 
 # GhostMarket GM NEP17 Contract
@@ -72,6 +76,7 @@ Coming soon...
 Upgradable NEP17 Contract.
 
 ### Compiling contract
+
 ```
 .compile2.py
 or
@@ -79,12 +84,14 @@ neo3-boa GhostMarketToken.py
 ```
 
 ### Deploying from neo-cli
+
 ```
 open wallet <wallet path>
 deploy <nef path> <manifest.path>
 ```
 
 ### Upgrading from neo-cli
+
 ```
 open wallet <path>
 update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
@@ -92,13 +99,14 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 
 ## Testing
 
-tests can be run with:
+Tests can be run with:
 
 ```
-test_gm.py
+python -m unittest test_gm
 ```
 
-individual test can be run witn  
+Individual test can be run with:
+
 ```
 python -m unittest test_gm.GhostTest.test_gm_decimals
 ```

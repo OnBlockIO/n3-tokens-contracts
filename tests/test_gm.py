@@ -15,16 +15,17 @@ from boa3.neo.core.types.InteropInterface import InteropInterface
 
 CONTRACT_BUILT = False
 
+
 class GhostTest(BoaTest):
     p = Path(__file__)
     GHOST_ROOT = str(p.parents[1])
     PRJ_ROOT = str(p.parents[2])
 
-    CONTRACT_PATH_JSON = GHOST_ROOT+ '/contracts/NEP17/GhostMarketToken.manifest.json'
+    CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
+    TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % GHOST_ROOT
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
