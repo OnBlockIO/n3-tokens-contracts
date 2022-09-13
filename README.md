@@ -57,7 +57,7 @@ python -m unittest test_ghost
 Individual test can be run with:
 
 ```
-python -m unittest test_ghost.GhostTest.test_gm_decimals
+python -m unittest test_ghost.GhostTest.test_ghost_decimals
 ```
 
 # GhostMarket GM NEP17 Contract
