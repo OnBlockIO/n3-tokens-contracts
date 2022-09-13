@@ -93,7 +93,7 @@
             },
             {
                 "name": "onNEP11Payment",
-                "offset": 76,
+                "offset": 77,
                 "parameters": [
                     {
                         "name": "from_address",
@@ -129,7 +129,7 @@
     "supportedstandards": [],
     "extra": {
         "Author": "Mirella Medeiros, Ricardo Prado and Lucas Uezu. COZ in partnership with Simpli",
-        "Email": "contact@coz.io",
-        "Description": "Smart contract that will help during test"
+        "Description": "Smart contract that will help during test",
+        "Email": "contact@coz.io"
     }
 }
