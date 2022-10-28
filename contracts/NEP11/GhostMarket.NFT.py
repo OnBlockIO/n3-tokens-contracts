@@ -4,7 +4,7 @@ from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
 from boa3.builtin.contract import abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract, CallFlags
-from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container
+from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container, log
 from boa3.builtin.interop.stdlib import serialize, deserialize
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
@@ -916,12 +916,24 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
         debug(['locked: ', lockedContent])
 
     if len(royalties) != 0:
+        expect(validateRoyalties(royalties), "Not a valid address")
         add_royalties(tokenIdBytes, cast(str, royalties))
         debug(['royalties: ', royalties])
 
     add_token_account(account, tokenIdBytes)
     post_transfer(None, account, tokenIdBytes, None)
     return tokenIdBytes
+
+
+def validateRoyalties(bytes: ByteString) -> bool:
+
+    strRoyalties: str = cast(str, bytes)
+    deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
+
+    for royalty in deserialized:
+        if "address" not in royalty or "value" not in royalty:
+            return False
+    return True
 
 
 def remove_token_account(holder: UInt160, tokenId: ByteString):
