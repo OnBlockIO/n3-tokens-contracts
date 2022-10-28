@@ -152,7 +152,7 @@ def balanceOf(account: UInt160) -> int:
     :param account: the account address to retrieve the balance for
     :type account: UInt160
     """
-    expect(validateAddress(account), "invalid address")
+    expect(validateAddress(account), "balanceOf - invalid address")
     debug([account])
     return get(account).to_int()
 
@@ -171,8 +171,8 @@ def allowance(from_address: UInt160, spender: UInt160) -> int:
     
     :return: the number of tokens allowed to be spent.
     """
-    expect(validateAddress(from_address), "invalid from_address address")
-    expect(validateAddress(spender), "invalid spender address")
+    expect(validateAddress(from_address), "allowance - invalid from_address address")
+    expect(validateAddress(spender), "allowance - invalid spender address")
     all = get(mk_allowance_key(from_address, spender), get_read_only_context()).to_int()
     debug(['allowance: ', all])
     return all
@@ -193,11 +193,11 @@ def approve(from_address: UInt160, spender: UInt160, amount: int) -> bool:
     
     :return: bool value of operation success.
     """
-    expect(check_witness(from_address),"Invalid witness" )
-    expect(validateAddress(spender), "invalid spender address")
-    expect(amount >= 0, "amount has to be >= 0")
+    expect(check_witness(from_address),"approve - invalid witness" )
+    expect(validateAddress(spender), "approve - invalid spender address")
+    expect(amount >= 0, "approve - amount has to be >= 0")
     # contract should not be paused
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(not isPaused(), "approve - contract paused")
 
     if amount == 0:
         remove_allowance(from_address, spender)
@@ -210,7 +210,7 @@ def approve(from_address: UInt160, spender: UInt160, amount: int) -> bool:
 @public
 def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, amount: int, data: Any) -> bool:
     """
-    Transfers an amount of NEP17 tokens from one account to another using the allowance mechanism.
+    Transfers an amount of NEP-17 tokens from one account to another using the allowance mechanism.
 
     If the method succeeds, it must fire the `Transfer` event and must return true, even if the amount is 0,
     or from and to are the same address.
@@ -221,7 +221,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
     :type from_address: UInt160
     :param to_address: the address to transfer to
     :type to_address: UInt160
-    :param amount: the amount of NEP17 tokens to transfer
+    :param amount: the amount of NEP-17 tokens to transfer
     :type amount: int
     :param data: whatever data is pertinent to the onPayment method
     :type data: Any
@@ -229,13 +229,13 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
     :return: whether the transfer was successful
     :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
     """
-    expect(validateAddress(spender), "invalid spender address")
-    expect(validateAddress(from_address), "invalid from address")
-    expect(validateAddress(to_address), "invalid to address")
+    expect(validateAddress(spender), "transferFrom - invalid spender address")
+    expect(validateAddress(from_address), "transferFrom - invalid from address")
+    expect(validateAddress(to_address), "transferFrom - invalid to address")
     # contract should not be paused
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(not isPaused(), "transferFrom - contract paused")
     # the parameter amount must be greater than or equal to 0. If not, this method should throw an exception.
-    expect(amount >= 0, "amount must be greater than or equal to 0")
+    expect(amount >= 0, "transferFrom - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
     from_balance = get(from_address).to_int()
@@ -250,7 +250,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
 
     # allowance should be > amount
     all = get(mk_allowance_key(from_address, spender), get_read_only_context()).to_int()
-    expect(amount <= all, "spender allowance exceeded")
+    expect(amount <= all, "transferFrom - spender allowance exceeded")
 
     # update new allowance
     if all == amount:
@@ -280,7 +280,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
 @public
 def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any) -> bool:
     """
-    Transfers an amount of NEP17 tokens from one account to another
+    Transfers an amount of NEP-17 tokens from one account to another
 
     If the method succeeds, it must fire the `Transfer` event and must return true, even if the amount is 0,
     or from and to are the same address.
@@ -289,7 +289,7 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     :type from_address: UInt160
     :param to_address: the address to transfer to
     :type to_address: UInt160
-    :param amount: the amount of NEP17 tokens to transfer
+    :param amount: the amount of NEP-17 tokens to transfer
     :type amount: int
     :param data: whatever data is pertinent to the onPayment method
     :type data: Any
@@ -297,12 +297,12 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     :return: whether the transfer was successful
     :raise AssertionError: raised if `from_address` or `to_address` length is not 20 or if `amount` is less than zero.
     """
-    expect(validateAddress(from_address), "invalid from address")
-    expect(validateAddress(to_address), "invalid to address")
+    expect(validateAddress(from_address), "transfer - invalid from address")
+    expect(validateAddress(to_address), "transfer - invalid to address")
     # contract should not be paused
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(not isPaused(), "transfer - contract paused")
     # the parameter amount must be greater than or equal to 0. If not, this method should throw an exception.
-    expect(amount >= 0, "amount must be greater than or equal to 0")
+    expect(amount >= 0, "transfer - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
     from_balance = get(from_address).to_int()
@@ -335,7 +335,7 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
 
 def post_transfer(from_address: Union[UInt160, None], to_address: Union[UInt160, None], amount: int, data: Any):
     """
-    Checks if the one receiving NEP17 tokens is a smart contract and if it's one the onPayment method will be called
+    Checks if the one receiving NEP-17 tokens is a smart contract and if it's one the onPayment method will be called
 
     :param from_address: the address of the sender
     :type from_address: UInt160
@@ -395,7 +395,7 @@ def update(script: bytes, manifest: bytes):
     :raise AssertionError: raised if witness is not verified
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for update')
+    expect(verified, 'update - `account` is not allowed for update')
     update_contract(script, manifest) 
     debug(['update called and done'])
 
@@ -443,9 +443,9 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for setAuthorizedAddress')
-    expect(validateAddress(address), "invalid address in set auth")
-    expect(isinstance(authorized, bool), "authorized has to be of type bool")
+    expect(verified, 'setAuthorizedAddress - `account` is not allowed for setAuthorizedAddress')
+    expect(validateAddress(address), "setAuthorizedAddress - invalid address in set auth")
+    expect(isinstance(authorized, bool), "setAuthorizedAddress - authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -493,8 +493,8 @@ def updatePause(status: bool) -> bool:
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for updatePause')
-    expect(isinstance(status, bool), "status has to be of type bool")
+    expect(verified, 'updatePause - `account` is not allowed for updatePause')
+    expect(isinstance(status, bool), "updatePause - status has to be of type bool")
     put(PAUSED, status)
     debug(['updatePause: ', get(PAUSED).to_bool()])
     return get(PAUSED).to_bool() 

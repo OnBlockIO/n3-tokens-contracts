@@ -201,7 +201,7 @@ def balanceOf(owner: UInt160) -> int:
     :return: the total amount of tokens owned by the specified address.
     :raise AssertionError: raised if `owner` length is not 20.
     """
-    expect(validateAddress(owner), "Not a valid address")
+    expect(validateAddress(owner), "balanceOf - not a valid address")
     debug(['balanceOf: ', get(mk_balance_key(owner), get_read_only_context()).to_int()])
     return get(mk_balance_key(owner), get_read_only_context()).to_int()
 
@@ -218,7 +218,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     :return: an iterator that contains all of the token ids owned by the specified address.
     :raise AssertionError: raised if `owner` length is not 20.
     """
-    expect(validateAddress(owner), "Not a valid address")
+    expect(validateAddress(owner), "tokensOf - not a valid address")
     flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
     context = get_read_only_context()
     return find(mk_account_key(owner), context, flags)
@@ -249,8 +249,8 @@ def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
     :return: whether the transfer was successful
     :raise AssertionError: raised if `to` length is not 20 or if `tokenId` is not a valid NFT or if the contract is paused.
     """
-    expect(validateAddress(to), "Not a valid address")
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(validateAddress(to), "transfer - not a valid address")
+    expect(not isPaused(), "transfer - contract paused")
     token_owner = get_owner_of(tokenId)
 
     if not check_witness(token_owner):
@@ -270,7 +270,7 @@ def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
 
 def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: ByteString, data: Any):
     """
-    Checks if the one receiving NEP11 tokens is a smart contract and if it's one the onPayment method will be called - internal
+    Checks if the one receiving NEP-11 tokens is a smart contract and if it's one the onPayment method will be called - internal
 
     :param token_owner: the address of the sender
     :type token_owner: UInt160
@@ -331,7 +331,7 @@ def properties(tokenId: ByteString) -> Dict[Any, Any]:
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     metaBytes = cast(str, get_meta(tokenId))
-    expect(len(metaBytes) != 0, 'No metadata available for token')
+    expect(len(metaBytes) != 0, 'properties - no metadata available for token')
     metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
 
     return metaObject
@@ -350,7 +350,7 @@ def propertiesJson(tokenId: ByteString) -> ByteString:
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     meta = get_meta(tokenId)
-    expect(len(meta) != 0, 'No metadata available for token')
+    expect(len(meta) != 0, 'propertiesJson - no metadata available for token')
     debug(['properties: ', meta])
     return meta
 
@@ -420,7 +420,7 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     """
     if calling_script_hash != GAS:
         abort()
-    expect(amount > 0, "amount has to be > 0")
+    expect(amount > 0, "onNEP17Payment - amount has to be > 0")
     debug(["onNEP17Payment", data])
 
 
@@ -438,7 +438,7 @@ def burn(tokenId: ByteString) -> bool:
     :return: whether the burn was successful.
     :raise AssertionError: raised if the contract is paused.
     """
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(not isPaused(), "burn - contract paused")
     return internal_burn(tokenId)
 
 
@@ -473,16 +473,16 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
     :return: tokenId of the token minted
     :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it or if the contract is paused or if check witness fails.
     """
-    expect(validateAddress(account), "Not a valid address")  # not really necessary because check_witness would catch an invalid address
-    expect(not isPaused(), "GhostMarket contract is currently paused")
+    expect(validateAddress(account), "mint - not a valid address")  # not really necessary because check_witness would catch an invalid address
+    expect(not isPaused(), "mint - contract paused")
 
     fee = get_mint_fee()
-    expect(fee >= 0, "Mint fee can't be < 0")
-    expect(check_witness(account), "Invalid witness" )
+    expect(fee >= 0, "mint - fee can't be < 0")
+    expect(check_witness(account), "mint - invalid witness" )
 
     if fee > 0:
         success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        expect(success, "Fee payment failed!")
+        expect(success, "mint - fee payment failed!")
 
     return internal_mint(account, meta, lockedContent, royalties)
 
@@ -503,9 +503,9 @@ def multiMint(account: UInt160, meta: List[ByteString], lockedContent: List[Byte
     :return: list of tokenId of the tokens minted
     :raise AssertionError: raised if royalties or lockContent or meta is not a list
     """
-    expect(isinstance(meta, list), "meta format should be a list!")
-    expect(isinstance(lockedContent, list), "lock content format should be a list!")
-    expect(isinstance(royalties, list), "royalties format should be a list!")
+    expect(isinstance(meta, list), "multiMint - meta format should be a list!")
+    expect(isinstance(lockedContent, list), "multiMint - lock content format should be a list!")
+    expect(isinstance(royalties, list), "multiMint - royalties format should be a list!")
 
     nfts: List[ByteString] = []
     for i in range(0, len(meta)):
@@ -529,8 +529,8 @@ def mintWhitelisted(account: UInt160, meta: ByteString, lockedContent: ByteStrin
     :return: tokenId of the token minted
     :raise AssertionError: raised if address is not whitelisted or if contract is paused
     """
-    expect(not isPaused(), "GhostMarket contract is currently paused")
-    expect(isWhitelisted(), '`account` is not whitelisted for mintWhitelisted')
+    expect(not isPaused(), "mintWhitelisted - contract paused")
+    expect(isWhitelisted(), 'mintWhitelisted - `account` is not whitelisted for mintWhitelisted')
 
     return internal_mint(account, meta, lockedContent, royalties)
 
@@ -561,8 +561,8 @@ def withdrawFee(account: UInt160) -> bool:
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for withdrawFee')
-    expect(validateAddress(account), "Not a valid address")
+    expect(verified, 'withdrawFee - `account` is not allowed for withdrawFee')
+    expect(validateAddress(account), "withdrawFee - not a valid address")
     current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash], CallFlags.READ_ONLY))
     on_withdraw_mint_fee(account, current_balance)
     debug(['withdrawFee: ', current_balance])
@@ -606,8 +606,8 @@ def setMintFee(fee: int):
     :emits MintFeeUpdated
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for setMintFee')
-    expect(fee >= 0, "fee has to be >= 0")
+    expect(verified, 'setMintFee - `account` is not allowed for setMintFee')
+    expect(fee >= 0, "setMintFee - fee has to be >= 0")
     set_mint_fee(fee)
     on_update_mint_fee(calling_script_hash, fee)
 
@@ -638,7 +638,7 @@ def getLockedContent(tokenId: ByteString) -> ByteString:
     """
     owner = get_owner_of(tokenId)
 
-    expect(check_witness(owner), "Prohibited access to locked content!")
+    expect(check_witness(owner), "getLockedContent - prohibited access to locked content!")
     set_locked_view_counter(tokenId)
     
     debug(['getLockedContent: ', get_locked_content(tokenId)])
@@ -687,9 +687,9 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for setAuthorizedAddress')
-    expect(validateAddress(address), "Not a valid address")
-    expect(isinstance(authorized, bool), "authorized has to be of type bool")
+    expect(verified, 'setAuthorizedAddress - `account` is not allowed for setAuthorizedAddress')
+    expect(validateAddress(address), "setAuthorizedAddress - not a valid address")
+    expect(isinstance(authorized, bool), "setAuthorizedAddress - authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -728,9 +728,9 @@ def setWhitelistedAddress(address: UInt160, authorized: bool):
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for setWhitelistedAddress')
-    expect(validateAddress(address), "Not a valid address")
-    expect(isinstance(authorized, bool), "authorized has to be of type bool")
+    expect(verified, 'setWhitelistedAddress - `account` is not allowed for setWhitelistedAddress')
+    expect(validateAddress(address), "setWhitelistedAddress - not a valid address")
+    expect(isinstance(authorized, bool), "setWhitelistedAddress - authorized has to be of type bool")
     serialized = get(WL_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -762,8 +762,8 @@ def updatePause(status: bool) -> bool:
     :raise AssertionError: raised if witness is not verified.
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for updatePause')
-    expect(isinstance(status, bool), "status has to be of type bool")
+    expect(verified, 'updatePause - `account` is not allowed for updatePause')
+    expect(isinstance(status, bool), "updatePause - status has to be of type bool")
     put(PAUSED, status)
     debug(['updatePause: ', get(PAUSED, get_read_only_context()).to_bool()])
     return get(PAUSED, get_read_only_context()).to_bool() 
@@ -839,7 +839,7 @@ def update(script: bytes, manifest: bytes):
     :raise AssertionError: raised if witness is not verified
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for update')
+    expect(verified, 'update - `account` is not allowed for update')
     update_contract(script, manifest) 
     debug(['update called and done'])
 
@@ -852,7 +852,7 @@ def destroy():
     :raise AssertionError: raised if witness is not verified
     """
     verified: bool = verify()
-    expect(verified, '`account` is not allowed for destroy')
+    expect(verified, 'destroy - `account` is not allowed for destroy')
     destroy_contract() 
     debug(['destroy called and done'])
 
@@ -898,7 +898,7 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
     :return: tokenId of the token minted
     :raise AssertionError: raised if meta is empty, or if contract is paused.
     """
-    expect(len(meta) != 0, '`meta` can not be empty')
+    expect(len(meta) != 0, 'internal_mint - `meta` can not be empty')
 
     tokenId = get(TOKEN_COUNT, get_read_only_context()).to_int() + 1
     put(TOKEN_COUNT, tokenId)
@@ -916,7 +916,7 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
         debug(['locked: ', lockedContent])
 
     if len(royalties) != 0:
-        expect(validateRoyalties(royalties), "Not a valid royalties format")
+        expect(validateRoyalties(royalties), "internal_mint - not a valid royalties format")
         add_royalties(tokenIdBytes, cast(str, royalties))
         debug(['royalties: ', royalties])
 

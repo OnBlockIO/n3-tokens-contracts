@@ -665,7 +665,7 @@ class GhostTest(BoaTest):
             signer_accounts=[self.OTHER_ACCOUNT_1],
             expected_result_type=bytes)
 
-        # the smart contract will abort if any address calls the NEP11 onPayment method
+        # the smart contract will abort if any address calls the NEP-11 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
             result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP11Payment', 
                 self.OTHER_ACCOUNT_1, 1, token, None,
@@ -685,7 +685,7 @@ class GhostTest(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
-        # the smart contract will abort if some address other than GAS calls the NEP17 onPayment method
+        # the smart contract will abort if some address other than GAS calls the NEP-17 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
             self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP17Payment', aux_address, add_amount, None,
                                     signer_accounts=[aux_address])
