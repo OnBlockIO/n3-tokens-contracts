@@ -4,7 +4,7 @@ from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
 from boa3.builtin.contract import abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract, CallFlags
-from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container, log
+from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
