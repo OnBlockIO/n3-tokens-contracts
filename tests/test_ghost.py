@@ -29,6 +29,7 @@ class GhostTest(BoaTest):
     TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}', 'utf-8')
     LOCK_CONTENT = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
+    ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
     CONTRACT = UInt160()
 
     def build_contract(self, preprocess=False):
@@ -280,6 +281,13 @@ class GhostTest(BoaTest):
         # add some gas for fees
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
+
+        # should fail because royalties are bogus
+        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
+            token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
+                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES_BOGUS,
+                    signer_accounts=[aux_address],
+                    expected_result_type=bytes)
 
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
