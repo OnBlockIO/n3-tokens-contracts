@@ -1,8 +1,5 @@
-from boa3 import constants
 from pathlib import Path
-from boa3.boa3 import Boa3
 from boa3.neo import to_script_hash
-from boa3.neo.cryptography import hash160
 from boa3.neo.vm.type.String import String
 from boa3.neo.smart_contract.VoidType import VoidType
 from boa3_test.tests.boa_test import BoaTest
@@ -13,8 +10,6 @@ from boa3.builtin.interop.iterator import Iterator
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
 from boa3.neo.core.types.InteropInterface import InteropInterface
 
-CONTRACT_BUILT = False
-
 
 class GhostTest(BoaTest):
     p = Path(__file__)
@@ -24,8 +19,8 @@ class GhostTest(BoaTest):
     CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.manifest.json'
     CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
     CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
-    # TODO add .env file and move test engine path there
     TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % GHOST_ROOT
+    CHECKPOINT_PATH = '%s/checkpoints/contracts-deployed.neoxp-checkpoint'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))

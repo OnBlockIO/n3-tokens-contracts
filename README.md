@@ -6,7 +6,7 @@ https://dora.coz.io/contract/neo3/mainnet/0x577a51f7d39162c9de1db12a6b319c848e4c
 
 ## Audit
 
-Coming soon...
+Contract has been fully audited by Red4Sec.
 
 ## Technical Information
 
@@ -69,7 +69,7 @@ https://dora.coz.io/contract/neo3/mainnet/0x9b049f1283515eef1d3f6ac610e1595ed25c
 
 ## Audit
 
-Coming soon...
+Contract has been fully audited by Red4Sec.
 
 ## Technical Information
 
