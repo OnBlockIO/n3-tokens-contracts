@@ -692,6 +692,7 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     expect(isinstance(authorized, bool), "setAuthorizedAddress - authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
+    expect(len(auth) <= 10, "setAuthorizedAddress - authorized addresses count has to be <= 10")
 
     if authorized:
         found = False
@@ -733,6 +734,7 @@ def setWhitelistedAddress(address: UInt160, authorized: bool):
     expect(isinstance(authorized, bool), "setWhitelistedAddress - authorized has to be of type bool")
     serialized = get(WL_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
+    expect(len(auth) <= 10, "setWhitelistedAddress - whitelisted addresses count has to be <= 10")
 
     if authorized:
         found = False

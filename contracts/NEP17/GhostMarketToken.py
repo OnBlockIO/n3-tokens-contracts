@@ -139,7 +139,7 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
-    return get(SUPPLY_KEY).to_int()
+    return get(SUPPLY_KEY, get_read_only_context()).to_int()
 
 
 @public(safe=True)
@@ -154,7 +154,7 @@ def balanceOf(account: UInt160) -> int:
     """
     expect(validateAddress(account), "balanceOf - invalid address")
     debug([account])
-    return get(account).to_int()
+    return get(account, get_read_only_context()).to_int()
 
 @public(safe=True)
 def allowance(from_address: UInt160, spender: UInt160) -> int:
@@ -238,7 +238,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
     expect(amount >= 0, "transferFrom - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
-    from_balance = get(from_address).to_int()
+    from_balance = get(from_address, get_read_only_context()).to_int()
     if from_balance < amount:
         return False
 
@@ -266,7 +266,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
         else:
             put(from_address, from_balance - amount)
 
-        to_balance = get(to_address).to_int()
+        to_balance = get(to_address, get_read_only_context()).to_int()
         put(to_address, to_balance + amount)
 
     # if the method succeeds, it must fire the transfer event
@@ -305,7 +305,7 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     expect(amount >= 0, "transfer - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
-    from_balance = get(from_address).to_int()
+    from_balance = get(from_address, get_read_only_context()).to_int()
     if from_balance < amount:
         return False
 
@@ -322,7 +322,7 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
         else:
             put(from_address, from_balance - amount)
 
-        to_balance = get(to_address).to_int()
+        to_balance = get(to_address, get_read_only_context()).to_int()
         put(to_address, to_balance + amount)
 
     # if the method succeeds, it must fire the transfer event
@@ -360,10 +360,10 @@ def _deploy(data: Any, upgrade: bool):
     if upgrade:
         return
 
-    if get(DEPLOYED).to_bool():
+    if get(DEPLOYED, get_read_only_context()).to_bool():
         abort()
 
-    if get(SUPPLY_KEY).to_int() > 0:
+    if get(SUPPLY_KEY, get_read_only_context()).to_int() > 0:
         abort()
 
     tx = cast(Transaction, script_container)
@@ -420,7 +420,7 @@ def getAuthorizedAddress() -> list[UInt160]:
     :return: whether the transaction signature is correct
     :raise AssertionError: raised if witness is not verified.
     """
-    serialized = get(AUTH_ADDRESSES)
+    serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
     return auth
@@ -446,8 +446,9 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     expect(verified, 'setAuthorizedAddress - `account` is not allowed for setAuthorizedAddress')
     expect(validateAddress(address), "setAuthorizedAddress - invalid address in set auth")
     expect(isinstance(authorized, bool), "setAuthorizedAddress - authorized has to be of type bool")
-    serialized = get(AUTH_ADDRESSES)
+    serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
+    expect(len(auth) <= 10, "setAuthorizedAddress - authorized addresses count has to be <= 10")
 
     if authorized:
         found = False
@@ -477,7 +478,7 @@ def isPaused() -> bool:
     :return: whether the contract is paused
     """
     debug(['isPaused: ', get(PAUSED).to_bool()])
-    if get(PAUSED).to_bool():
+    if get(PAUSED, get_read_only_context()).to_bool():
         return True
     return False
 
@@ -497,7 +498,7 @@ def updatePause(status: bool) -> bool:
     expect(isinstance(status, bool), "updatePause - status has to be of type bool")
     put(PAUSED, status)
     debug(['updatePause: ', get(PAUSED).to_bool()])
-    return get(PAUSED).to_bool() 
+    return get(PAUSED, get_read_only_context()).to_bool() 
 
 
 def verify() -> bool:
@@ -510,7 +511,7 @@ def verify() -> bool:
 
     :return: whether the transaction signature is correct
     """
-    serialized = get(AUTH_ADDRESSES)
+    serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
     tx = cast(Transaction, script_container)
     for addr in auth: 
