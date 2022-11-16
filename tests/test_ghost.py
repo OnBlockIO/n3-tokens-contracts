@@ -291,7 +291,7 @@ class GhostTest(BoaTest):
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
                 aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[aux_address], expected_result_type=int)
+                signer_accounts=[aux_address], expected_result_type=bytes)
 
         print("token: " + str(token))
         print("get props now: ")
@@ -744,7 +744,7 @@ class GhostTest(BoaTest):
         # mint + balanceOf
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
                 self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[self.OTHER_ACCOUNT_1], expected_result_type=ByteString)
+                signer_accounts=[self.OTHER_ACCOUNT_1], expected_result_type=bytes)
         balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
