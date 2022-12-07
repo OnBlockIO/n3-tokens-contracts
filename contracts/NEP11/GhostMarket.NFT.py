@@ -1,10 +1,9 @@
 from typing import Any, Dict, List, Union, cast
 
 from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
-from boa3.builtin.contract import abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
-from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract, CallFlags
-from boa3.builtin.interop.runtime import calling_script_hash, executing_script_hash, check_witness, script_container
+from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract
+from boa3.builtin.interop.runtime import check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
@@ -36,9 +35,6 @@ def manifest_metadata() -> NeoMetadata:
 # -------------------------------------------
 # TOKEN SETTINGS
 # -------------------------------------------
-
-# Fee on deploy
-MINT_FEE_ON_DEPLOY = 5_000_000  # initial mint fees of 0.05 GAS
 
 # Symbol of the Token
 TOKEN_SYMBOL = 'GHOST'
@@ -73,9 +69,7 @@ ROYALTIES_PREFIX = b'RYP'
 # -------------------------------------------
 
 TOKEN_COUNT = b'TOKEN_COUNT'
-MINT_FEE = b'MINT_FEE'
 AUTH_ADDRESSES = b'AUTH_ADDRESSES'
-WL_ADDRESSES = b'WITHLISTED'
 
 
 # -------------------------------------------
@@ -101,24 +95,6 @@ on_auth = CreateNewEvent(
         ('add', bool),
     ],
     'Authorized'
-)
-
-on_withdraw_mint_fee = CreateNewEvent(
-    # trigger when mint fees are withdrawn.
-    [
-        ('from_addr', UInt160),
-        ('value', int)
-    ],
-    'MintFeeWithdrawn'
-)
-
-on_update_mint_fee = CreateNewEvent(
-    # trigger when mint fees are updated.
-    [
-        ('from_addr', UInt160),
-        ('value', int)
-    ],
-    'MintFeeUpdated'
 )
 
 on_unlock = CreateNewEvent(
@@ -395,34 +371,11 @@ def internal_deploy(owner: UInt160):
     put(DEPLOYED, True)
     put(PAUSED, False)
     put(TOKEN_COUNT, 0)
-    put(MINT_FEE, MINT_FEE_ON_DEPLOY)
 
     auth: List[UInt160] = []
     auth.append(owner)
     serialized = serialize(auth)
     put(AUTH_ADDRESSES, serialized)
-
-    wl: List[UInt160] = []
-    wl.append(owner)
-    wl_serialized = serialize(auth)
-    put(WL_ADDRESSES, wl_serialized)
-
-
-@public
-def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
-    """
-    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
-    :type from_address: UInt160
-    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
-    :type amount: int
-    :param data: any pertinent data that might validate the transaction
-    :type data: Any
-    """
-    if calling_script_hash != GAS:
-        abort()
-    expect(amount > 0, "onNEP17Payment - amount has to be > 0")
-    debug(["onNEP17Payment", data])
-
 
 # -------------------------------------------
 # GhostMarket Methods
@@ -471,18 +424,10 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
     :param royalties: the royalties to use for this token
     :type royalties: ByteString 
     :return: tokenId of the token minted
-    :raise AssertionError: raised if mint fee is less than than 0 or if the account does not have enough to pay for it or if the contract is paused or if check witness fails.
+    :raise AssertionError: raised if the contract is paused or if check witness fails.
     """
-    expect(validateAddress(account), "mint - not a valid address")  # not really necessary because check_witness would catch an invalid address
     expect(not isPaused(), "mint - contract paused")
-
-    fee = get_mint_fee()
-    expect(fee >= 0, "mint - fee can't be < 0")
     expect(check_witness(account), "mint - invalid witness" )
-
-    if fee > 0:
-        success: bool = call_contract(GAS, 'transfer', [account, executing_script_hash, fee, None])
-        expect(success, "mint - fee payment failed!")
 
     return internal_mint(account, meta, lockedContent, royalties)
 
@@ -512,28 +457,6 @@ def multiMint(account: UInt160, meta: List[ByteString], lockedContent: List[Byte
         nfts.append(mint(account, meta[i], lockedContent[i], royalties[i]))
     return nfts
 
-
-@public
-def mintWhitelisted(account: UInt160, meta: ByteString, lockedContent: ByteString, royalties: ByteString) -> ByteString:
-    """
-    Mint new token with no fees - whitelisted only.
-
-    :param account: the address of the account that is minting token
-    :type account: UInt160
-    :param meta: the metadata to use for this token
-    :type meta: ByteString
-    :param lockedContent: the lock content to use for this token
-    :type lockedContent: ByteString
-    :param royalties: the royalties to use for this token
-    :type royalties: ByteString
-    :return: tokenId of the token minted
-    :raise AssertionError: raised if address is not whitelisted or if contract is paused
-    """
-    expect(not isPaused(), "mintWhitelisted - contract paused")
-    expect(isWhitelisted(), 'mintWhitelisted - `account` is not whitelisted for mintWhitelisted')
-
-    return internal_mint(account, meta, lockedContent, royalties)
-
 @public(safe=True)
 def getRoyalties(tokenId: ByteString) -> ByteString:
     """
@@ -547,70 +470,6 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
     royalties = get_royalties(tokenId)
     debug(['getRoyalties: ', royalties])
     return royalties
-
-
-@public
-def withdrawFee(account: UInt160) -> bool:
-    """
-    Withdraw mint fees.
-
-    :param account: the address of the account that is withdrawing fees
-    :type account: UInt160
-    :return: whether the transaction was successful.
-    :emits MintFeeWithdrawn: on success emits MintFeeWithdrawn
-    :raise AssertionError: raised if witness is not verified.
-    """
-    verified: bool = verify()
-    expect(verified, 'withdrawFee - `account` is not allowed for withdrawFee')
-    expect(validateAddress(account), "withdrawFee - not a valid address")
-    current_balance = cast(int, call_contract(GAS, 'balanceOf', [executing_script_hash], CallFlags.READ_ONLY))
-    on_withdraw_mint_fee(account, current_balance)
-    debug(['withdrawFee: ', current_balance])
-
-    status: bool = call_contract(GAS, 'transfer', [executing_script_hash, account, current_balance, None])
-    return status
-
-
-@public(safe=True)
-def getFeeBalance() -> Any:
-    """
-    Get mint fees balance.
-
-    :return: balance of mint fees.
-    """
-    balance = call_contract(GAS, 'balanceOf', [executing_script_hash], CallFlags.READ_ONLY)
-    debug(['getFeeBalance: ', balance])
-    return balance
-
-
-@public(safe=True)
-def getMintFee() -> int:
-    """
-    Get configured mint fees value.
-
-    :return: value of mint fees.
-    """
-    fee = get_mint_fee()
-    debug(['getMintFee: ', fee])
-    return fee
-
-
-@public
-def setMintFee(fee: int):
-    """
-    Set mint fees value.
-
-    :param fee: fee to be used when minting
-    :type fee: int
-    :raise AssertionError: raised if witness is not verified.
-    :emits MintFeeUpdated
-    """
-    verified: bool = verify()
-    expect(verified, 'setMintFee - `account` is not allowed for setMintFee')
-    expect(fee >= 0, "setMintFee - fee has to be >= 0")
-    set_mint_fee(fee)
-    on_update_mint_fee(calling_script_hash, fee)
-
 
 @public(safe=True)
 def getLockedContentViewCount(tokenId: ByteString) -> int:
@@ -713,47 +572,6 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
 
 
 @public
-def setWhitelistedAddress(address: UInt160, authorized: bool):
-    """
-    Configure whitelisted addresses.
-
-    When this contract address is included in the transaction signature,
-    this method will be triggered as a VerificationTrigger to verify that the signature is correct.
-    For example, this method needs to be called when using the no fee mint method.
-
-    :param address: the address of the account that is being authorized
-    :type address: UInt160
-    :param authorized: authorization status of this address
-    :type authorized: bool
-    :return: whether the transaction signature is correct
-    :raise AssertionError: raised if witness is not verified.
-    """
-    verified: bool = verify()
-    expect(verified, 'setWhitelistedAddress - `account` is not allowed for setWhitelistedAddress')
-    expect(validateAddress(address), "setWhitelistedAddress - not a valid address")
-    expect(isinstance(authorized, bool), "setWhitelistedAddress - authorized has to be of type bool")
-    serialized = get(WL_ADDRESSES, get_read_only_context())
-    auth = cast(list[UInt160], deserialize(serialized))
-    expect(len(auth) <= 10, "setWhitelistedAddress - whitelisted addresses count has to be <= 10")
-
-    if authorized:
-        found = False
-        for i in auth:
-            if i == address:
-                found = True
-
-        if not found:
-            auth.append(address)
-
-        put(WL_ADDRESSES, serialize(auth))
-        on_auth(address, 1, True)
-    else:
-        auth.remove(address)
-        put(WL_ADDRESSES, serialize(auth))
-        on_auth(address, 1, False)
-
-
-@public
 def updatePause(status: bool) -> bool:
     """
     Set contract pause status.
@@ -788,26 +606,6 @@ def verify() -> bool:
     for addr in auth: 
         if check_witness(addr):
             debug(["Verification successful", addr, tx.sender])
-            return True
-
-    debug(["Verification failed", addr])
-    return False
-
-
-@public(safe=True)
-def isWhitelisted() -> bool:
-    """
-    Check if the address is allowed to mint without fees.
-
-    If the address is whitelisted, it's allowed to mint without any fees.
-
-    :return: whether the address is allowed to mint without fees
-    """
-    serialized = get(WL_ADDRESSES, get_read_only_context())
-    auth = cast(list[UInt160], deserialize(serialized))
-    for addr in auth: 
-        if check_witness(addr):
-            debug(["Verification successful", addr])
             return True
 
     debug(["Verification failed", addr])
@@ -969,11 +767,6 @@ def set_owner_of(tokenId: ByteString, owner: UInt160):
     put(key, owner)
 
 
-def set_mint_fee(amount: int):
-    debug(['set_mint_fee: ', amount])
-    put(MINT_FEE, amount)
-
-
 def add_to_supply(amount: int):
     total = totalSupply() + (amount)
     debug(['add_to_supply: ', amount])
@@ -1066,12 +859,6 @@ def set_locked_view_counter(tokenId: ByteString):
     debug(['set_locked_view_counter: ', key, tokenId])
     count = get(key, get_read_only_context()).to_int() + 1
     put(key, count)
-
-
-def get_mint_fee() -> int:
-    fee = get(MINT_FEE, get_read_only_context())
-    debug(['get_mint_fee: ', fee])
-    return fee.to_int()
 
 
 # helpers
