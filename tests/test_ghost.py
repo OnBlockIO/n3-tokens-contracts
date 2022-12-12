@@ -196,29 +196,6 @@ class GhostTest(BoaTest):
         self.assertEqual(0, auth_events[1].arguments[1])
         self.assertEqual(0, auth_events[1].arguments[2])
 
-    def test_ghost_whitelist(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setWhitelistedAddress', 
-                self.OTHER_ACCOUNT_1, True,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=bool)
-        auth_events = engine.get_events('Authorized')
-
-        # check if the event was triggered and the address was authorized
-        self.assertEqual(1, auth_events[0].arguments[1])
-        self.assertEqual(1, auth_events[0].arguments[2])
-
-        # now deauthorize the address
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setWhitelistedAddress', 
-                self.OTHER_ACCOUNT_1, False,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=bool)
-        auth_events = engine.get_events('Authorized')
-        # check if the event was triggered and the address was authorized
-        self.assertEqual(1, auth_events[1].arguments[1])
-        self.assertEqual(0, auth_events[1].arguments[2])
-
     def test_ghost_pause(self):
         print("test: " + str(self._testMethodName))
         engine = self.prepare_testengine()
@@ -228,12 +205,12 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
         # pause contract
-        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', True,
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', True,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
 
@@ -245,7 +222,7 @@ class GhostTest(BoaTest):
                     expected_result_type=bytes)
 
         # unpause contract
-        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', False,
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', False,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
                 expected_result_type=int)
 
@@ -269,15 +246,7 @@ class GhostTest(BoaTest):
         print(to_hex_str(aux_address))
         print(to_hex_str(GAS_SCRIPT))
 
-        # should fail because account does not have enough for fees
-        # with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-        #     self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-        #         # aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-        #         aux_address, bytes(0), bytes(0), bytes(0),
-        #         signer_accounts=[aux_address],
-        #         expected_result_type=bytes)
-
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -288,7 +257,7 @@ class GhostTest(BoaTest):
                     signer_accounts=[aux_address],
                     expected_result_type=bytes)
 
-        # should succeed now that account has enough fees
+        # should succeed mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
                 aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address], expected_result_type=bytes)
@@ -327,7 +296,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -416,7 +385,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -472,7 +441,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -500,7 +469,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -564,7 +533,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -597,7 +566,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
@@ -654,7 +623,7 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
 
@@ -680,106 +649,14 @@ class GhostTest(BoaTest):
         aux_address = hash160(output)
         print(to_hex_str(aux_address))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
-        # the smart contract will abort if some address other than GAS calls the NEP-17 onPayment method
+        # the smart contract will abort if any address calls the NEP-17 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
             self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP17Payment', aux_address, add_amount, None,
                                     signer_accounts=[aux_address])
-
-    def test_ghost_mint_fee(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-
-        # add some gas for fees
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(self.OTHER_ACCOUNT_1, add_amount/2)
-        engine.add_gas(self.OWNER_SCRIPT_HASH, add_amount/2)
-
-        # setMintFee
-        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 1000,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-
-        # getMintFee should return the updated fee
-        fee_event = engine.get_events('MintFeeUpdated')
-        updated_fee = fee_event[0].arguments[1]
-        self.assertEqual(updated_fee, 1000)
-
-        # getMintFee should return the updated fee
-        fee2 = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
-        self.assertEqual(fee2, updated_fee)
-
-        # fails because account not whitelisted
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 1,
-                                    signer_accounts=[self.OTHER_ACCOUNT_1],
-                                    expected_result_type=int)
-
-        # fees should be the same since it failed
-        fee2 = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
-        self.assertEqual(fee2, updated_fee)
-        self.print_notif(engine.notifications)
-
-    def test_ghost_fee_balance(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-
-        # add some gas for fees
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
-
-        # check initial balance is 0
-        balance = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        self.assertEqual(0, balance)
-
-        # mint + balanceOf
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[self.OTHER_ACCOUNT_1], expected_result_type=bytes)
-        balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        initial_fee  = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getMintFee', expected_result_type=int)
-
-        # should have new balance
-        self.assertEqual(initial_fee, balance_after)
-
-        # set mint fee to 200000 + mint + getFeeBalance
-        fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setMintFee', 200000,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[self.OTHER_ACCOUNT_1],
-                expected_result_type=bytes)
-        balance_after_updated = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        
-        # should have new balance
-        self.assertEqual(balance_after_updated, balance_after + 200000)
-
-        # withdraw fee
-        success = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'withdrawFee', self.OWNER_SCRIPT_HASH,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        self.assertEqual(True, success)
-
-        # check balances after
-        ghost_balance_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
-        self.assertEqual(0, ghost_balance_after)
-        owner_balance = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', self.OWNER_SCRIPT_HASH)
-        self.assertEqual(initial_fee + 200000, owner_balance)
-        self.print_notif(engine.notifications)
 
         
     def test_ghost_locked_content(self):
@@ -787,15 +664,9 @@ class GhostTest(BoaTest):
         engine = self.prepare_testengine()
         engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
 
-        # add some gas for fees
+        # add some gas
         add_amount = 10 * 10 ** 8
         engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
-
-        # check if enough balance
-        balance = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getFeeBalance',
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-        self.assertEqual(0, balance)
 
         # mint + getLockedContentViewCount
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
