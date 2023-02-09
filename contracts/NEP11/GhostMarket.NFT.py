@@ -460,7 +460,7 @@ def multiMint(account: UInt160, meta: List[ByteString], lockedContent: List[Byte
 @public(safe=True)
 def getRoyalties(tokenId: ByteString) -> ByteString:
     """
-    Get a token royalties values.
+    Get a token royalties values - ghostmarket standard.
 
     :param tokenId: the token to get royalties values
     :type tokenId: ByteString
@@ -469,6 +469,23 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
     """
     royalties = get_royalties(tokenId)
     debug(['getRoyalties: ', royalties])
+    return royalties
+
+@public(safe=True)
+def royaltyInfo(tokenId: ByteString, royaltyToken: UInt160, salePrice: int) -> List[List[Any]]:
+    """
+    Get a token royalties values - official standard.
+
+    :param tokenId: the token used to calculate royalties values
+    :type tokenId: ByteString
+    :param royaltyToken: the currency used to calculate royalties values
+    :type royaltyToken: ByteString
+    :param salePrice: the sale amount used to calculate royalties values
+    :type salePrice: ByteString
+    :return: Returns a NeoVM Array stack item with single or multi array, each array still has two elements
+    :raise AssertionError: raised if any `tokenId` is not a valid NFT or if royaltyToken is not a valid UInt160 or salePrice incorrect
+    """
+    royalties = get_royalties_info(tokenId, salePrice)
     return royalties
 
 @public(safe=True)
@@ -829,6 +846,23 @@ def get_royalties(tokenId: ByteString) -> ByteString:
     val = get(key, get_read_only_context())
     return val
 
+def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
+    key = mk_royalties_key(tokenId)
+    val = get(key, get_read_only_context())
+
+    strRoyalties: str = cast(str, val)
+    deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
+
+    result: List[List[Any]] = []
+    for royalty in deserialized:
+        royalties: List[Any] = []
+        amount: int = salePrice * cast(int,royalty["value"]) // 10000
+        recipient: UInt160 = cast(UInt160,royalty["address"])
+        royalties.append(recipient)
+        royalties.append(amount)
+        result.append(royalties)
+
+    return result
 
 def add_royalties(tokenId: ByteString, royalties: str):
     key = mk_royalties_key(tokenId)
