@@ -4,7 +4,7 @@ from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import GAS, call_contract, destroy_contract, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
-from boa3.builtin.interop.stdlib import serialize, deserialize
+from boa3.builtin.interop.stdlib import serialize, deserialize, atoi
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
@@ -856,7 +856,7 @@ def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
     result: List[List[Any]] = []
     for royalty in deserialized:
         royalties: List[Any] = []
-        amount: int = salePrice * cast(int,royalty["value"]) // 10000
+        amount: int = salePrice * atoi(royalty["value"], 10) // 10000
         recipient: UInt160 = cast(UInt160,royalty["address"])
         royalties.append(recipient)
         royalties.append(amount)
