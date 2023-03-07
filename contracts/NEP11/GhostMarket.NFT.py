@@ -857,7 +857,7 @@ def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
     for royalty in deserialized:
         royalties: List[Any] = []
         amount: int = salePrice * atoi(royalty["value"], 10) // 10000
-        recipient: UInt160 = cast(UInt160,royalty["address"])
+        recipient: UInt160 = cast(UInt160,(royalty["address"]).to_script_hash())
         royalties.append(recipient)
         royalties.append(amount)
         result.append(royalties)
