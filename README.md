@@ -12,6 +12,18 @@ Contract has been fully audited by Red4Sec.
 
 Upgradable NEP-11 Contract.
 
+## Royalties
+
+This contract features royalties for NFT through two standard: GhostMarket standard and NEO official standard. For each sale happening on GhostMarket trading contract, a configurable percentage will be sent to the original creator (minter) if configured (or multiple ones). For convenience sake, both are supported on this contract, and any NFT minted support both.
+
+The details have to be passed as an array during minting, and follow a json structure.
+
+Note that the value is in BPS (ie 10% is 1000). We support multiple royalties, up to a maximum combined of 50% royalties. Note that if a NFT has royalties, our current implementation prevent it to be traded against indivisible currencies (like NEO), but if it does not have royalties it's allowed.
+
+[{"address":"NNau7VyBMQno89H8aAyirVJTdyLVeRxHGy","value":"1000"}] or [{"address":"NNau7VyBMQno89H8aAyirVJTdyLVeRxHGy","value":1000}]
+
+where NNau7VyBMQno89H8aAyirVJTdyLVeRxHGy would be getting 10% of all sales as royalties.
+
 ## Metadata
 
 This contract features two methods to handle properties:
