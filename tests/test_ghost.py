@@ -27,7 +27,7 @@ class GhostTest(BoaTest):
     TOKEN_META = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
     TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}', 'utf-8')
     LOCK_CONTENT = bytes('lockedContent', 'utf-8')
-    ROYALTIES = bytes('[{"address": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
+    ROYALTIES = bytes('[{"address": "someaddress", "value": "200"}, {"address": "someaddress2", "value": "300"}]', 'utf-8')
     ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
     CONTRACT = UInt160()
 
@@ -268,6 +268,8 @@ class GhostTest(BoaTest):
         print("props: " + str(properties))
         royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=ByteString)
         print("royalties: " + str(royalties))
+        royaltiesStandard = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'royaltyInfo', token, GAS_SCRIPT, 1_00000000, expected_result_type=ByteString)
+        print("royaltiesStandard: " + str(royaltiesStandard))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
