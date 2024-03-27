@@ -479,9 +479,9 @@ def royaltyInfo(tokenId: ByteString, royaltyToken: UInt160, salePrice: int) -> L
     :param tokenId: the token used to calculate royalties values
     :type tokenId: ByteString
     :param royaltyToken: the currency used to calculate royalties values
-    :type royaltyToken: ByteString
+    :type royaltyToken: UInt160
     :param salePrice: the sale amount used to calculate royalties values
-    :type salePrice: ByteString
+    :type salePrice: int
     :return: Returns a NeoVM Array stack item with single or multi array, each array still has two elements
     :raise AssertionError: raised if any `tokenId` is not a valid NFT or if royaltyToken is not a valid UInt160 or salePrice incorrect
     """
