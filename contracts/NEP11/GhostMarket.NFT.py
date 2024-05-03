@@ -19,13 +19,14 @@ from boa3.builtin.contract import to_script_hash
 # METADATA
 # -------------------------------------------
 
+@metadata
 def manifest_metadata() -> NeoMetadata:
     """
     Defines this smart contract's metadata information
     """
     meta = NeoMetadata()
     meta.author = "Mathias Enzensberger, Vincent Geneste"
-    meta.description = "GhostMarket NFT"
+    meta.description = "GhostMarket NEP11 contract"
     meta.email = "hello@ghostmarket.io"
     meta.supported_standards = ["NEP-11", "NEP-24"]
     meta.source = "https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP11/GhostMarket.NFT.py"
@@ -51,7 +52,7 @@ PAUSED = b'paused'
 
 
 # -------------------------------------------
-# Prefixes
+# PREFIXES
 # -------------------------------------------
 
 ACCOUNT_PREFIX = b'ACC'
@@ -66,7 +67,7 @@ ROYALTIES_PREFIX = b'RYP'
 
 
 # -------------------------------------------
-# Keys
+# KEYS
 # -------------------------------------------
 
 TOKEN_COUNT = b'TOKEN_COUNT'
@@ -74,7 +75,7 @@ AUTH_ADDRESSES = b'AUTH_ADDRESSES'
 
 
 # -------------------------------------------
-# Events
+# EVENTS
 # -------------------------------------------
 
 on_transfer = CreateNewEvent(
@@ -125,7 +126,7 @@ def debug(params: list):
 
 # DEBUG_END
 # -------------------------------------------
-# NEP-11 Methods
+# NEP-11 METHODS
 # -------------------------------------------
 
 
@@ -168,6 +169,7 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
+    debug(['totalSupply: ', to_int(get(SUPPLY_PREFIX))])
     return to_int(get(SUPPLY_PREFIX, get_read_only_context()))
 
 
@@ -315,7 +317,7 @@ def properties(tokenId: bytes) -> Dict[Any, Any]:
     metaBytes = cast(str, get_meta(tokenId))
     expect(len(metaBytes) != 0, 'properties - no metadata available for token')
     metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
-
+    debug(['properties: ', metaObject])
     return metaObject
 
 
@@ -384,7 +386,7 @@ def internal_deploy(owner: UInt160):
     put(AUTH_ADDRESSES, serialized)
 
 # -------------------------------------------
-# GhostMarket Methods
+# GHOSTMARKET METHODS
 # -------------------------------------------
 
 @public
@@ -912,7 +914,9 @@ def set_locked_view_counter(tokenId: bytes):
     put(key, count)
 
 
-# helpers
+# -------------------------------------------
+# HELPERS
+# -------------------------------------------
 
 def expect(condition: bool, message: str):
     allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY

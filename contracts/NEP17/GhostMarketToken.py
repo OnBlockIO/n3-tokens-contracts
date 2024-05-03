@@ -1,10 +1,10 @@
 from typing import Any, List, Union, cast
 
 from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, metadata, public
-from boa3.builtin.type.helper import to_int, to_bool, to_bytes
+from boa3.builtin.type.helper import to_int, to_bool
 from boa3.builtin.contract import Nep17TransferEvent, abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
-from boa3.builtin.interop.contract import call_contract, update_contract
+from boa3.builtin.interop.contract import CallFlags, call_contract, get_call_flags, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
 from boa3.builtin.interop.storage import delete, get, put, get_read_only_context
 from boa3.builtin.interop.stdlib import serialize, deserialize
@@ -59,7 +59,7 @@ ALLOWANCE_PREFIX = b'ALL'
 
 
 # -------------------------------------------
-# Events
+# EVENTS
 # -------------------------------------------
 
 on_transfer = Nep17TransferEvent
@@ -90,17 +90,21 @@ on_approve = CreateNewEvent(
 # DEBUG
 # -------------------------------------------
 
-debug = CreateNewEvent(
+on_debug = CreateNewEvent(
     [
         ('params', list),
     ],
     'Debug'
 )
+
+def debug(params: list):
+    allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY
+    if allow_notify == CallFlags.ALLOW_NOTIFY:
+        on_debug(params)
 # DEBUG_END
 
-
 # -------------------------------------------
-# NEP-17 Methods
+# NEP-17 METHODS
 # -------------------------------------------
 
 @public(safe=True)
@@ -114,6 +118,7 @@ def symbol() -> str:
 
     :return: a short string representing symbol of the token managed in this contract.
     """
+    debug(['symbol: ', TOKEN_SYMBOL])
     return TOKEN_SYMBOL
 
 
@@ -127,6 +132,7 @@ def decimals() -> int:
 
     :return: the number of decimals used by the token.
     """
+    debug(['decimals: ', TOKEN_DECIMALS])
     return TOKEN_DECIMALS
 
 
@@ -140,6 +146,7 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
+    debug(['totalSupply: ', to_int(get(SUPPLY_KEY))])
     return to_int(get(SUPPLY_KEY, get_read_only_context()))
 
 
@@ -154,7 +161,7 @@ def balanceOf(account: UInt160) -> int:
     :type account: UInt160
     """
     expect(validateAddress(account), "balanceOf - invalid address")
-    debug([account])
+    debug(['balanceOf: ', to_int(get(account, get_read_only_context()))])
     return to_int(get(account, get_read_only_context()))
 
 @public(safe=True)
@@ -347,9 +354,9 @@ def post_transfer(from_address: Union[UInt160, None], to_address: Union[UInt160,
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
-    if not isinstance(to_address, None):
+    if to_address is not None:
         contract = get_contract(to_address)
-        if not isinstance(contract, None):
+        if contract is not None:
             call_contract(to_address, 'onNEP17Payment', [from_address, amount, data])
 
 
@@ -402,7 +409,7 @@ def update(script: bytes, manifest: bytes):
 
 
 # -------------------------------------------
-# GhostMarket Methods
+# GHOSTMARKET METHODS
 # -------------------------------------------
 
 @public(safe=True)
@@ -523,7 +530,10 @@ def verify() -> bool:
     debug(["Verification failed", addr])
     return False
 
-# helpers
+
+# -------------------------------------------
+# HELPERS
+# -------------------------------------------
 
 def expect(condition: bool, message: str):
     assert condition, message
