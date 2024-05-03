@@ -921,7 +921,7 @@ def set_locked_view_counter(tokenId: bytes):
 def expect(condition: bool, message: str):
     allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY
     if allow_notify == CallFlags.ALLOW_NOTIFY:
-        assert condition
+        assert condition, message
     else:
         assert condition
 
