@@ -1,241 +1,215 @@
-from pathlib import Path
-from boa3.neo import to_script_hash
-from boa3.neo.vm.type.String import String
-from boa3.neo.smart_contract.VoidType import VoidType
-from boa3_test.tests.boa_test import BoaTest
-from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
-from boa3_test.tests.test_classes.testengine import TestEngine
-from boa3.builtin.type import UInt160
-from boa3.builtin.interop.iterator import Iterator
-from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
-from boa3.neo.core.types.InteropInterface import InteropInterface
+from neo3.contracts.contract import CONTRACT_HASHES
+from neo3.wallet import account
+
+from boa3_test.tests import boatestcase
 
 
-class GhostTest(BoaTest):
-    p = Path(__file__)
-    GHOST_ROOT = str(p.parents[1])
-    PRJ_ROOT = str(p.parents[2])
+class TestGM(boatestcase.BoaTestCase):
+    # default_folder: str = '../contracts/NEP17'
 
-    CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP17/GhostMarketToken.py'
-    TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % GHOST_ROOT
-    BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
-    DEPLOYER_ACCOUNT = UInt160(b'\x9c\xa5/\x04"{\xf6Z\xe2\xe5\xd1\xffe\x03\xd1\x9dd\xc2\x9cF')
-    OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
-    OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
-    OTHER_ACCOUNT_2 = bytes(range(20))
+    DECIMALS = 8
+    TOTAL_SUPPLY = 100_000_000 * 10 ** DECIMALS
+    OWNER_BALANCE = TOTAL_SUPPLY
 
-    def print_notif(self, notifications):
-        print('\n=========================== NOTIFICATIONS START ===========================\n')
-        for notif in notifications:
-            print(f"{str(notif.name)}: {str(notif.arguments)}")
-        print('\n=========================== NOTIFICATIONS END ===========================\n')
+    owner: account.Account
+    account1: account.Account
+    account2: account.Account
 
-    def deploy_contract(self, engine):
-        engine.add_contract(self.CONTRACT_PATH_NEF)
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', None, False,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH])
-        self.assertEqual(VoidType, result)
+    @classmethod
+    def setupTestCase(cls):
+        cls.owner = cls.node.wallet.account_new(label='owner', password='123')
+        cls.account1 = cls.node.wallet.account_new(label='test1', password='123')
+        cls.account2 = cls.node.wallet.account_new(label='test2', password='123')
 
-    def prepare_testengine(self, preprocess=False) -> TestEngine:
-        engine = TestEngine(self.TEST_ENGINE_PATH)
-        engine.reset_engine()
-        return engine
+        cls.OWNER_BALANCE = cls.TOTAL_SUPPLY
+        super().setupTestCase()
 
-    def test_gm_compile(self):
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
+    @classmethod
+    async def asyncSetupClass(cls) -> None:
+        await super().asyncSetupClass()
+
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.owner.script_hash, 100)
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account1.script_hash, 100)
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account2.script_hash, 100)
+
+        await cls.set_up_contract('..', 'contracts/NEP17', 'GhostMarketToken.py', signing_account=cls.owner)
+        mint_amount = 100
+        await cls.transfer(
+            cls.contract_hash,
+            cls.owner.script_hash,
+            cls.account1.script_hash,
+            mint_amount,
+            signing_account=cls.owner
+        )
+        cls.OWNER_BALANCE -= mint_amount * 10 ** cls.DECIMALS
+
+    def test_compile(self):
+        path = self.get_contract_path('..', 'contracts/NEP17', 'GhostMarketToken.py')
+        _, manifest = self.assertCompile(path, get_manifest=True)
 
         self.assertIn('supportedstandards', manifest)
         self.assertIsInstance(manifest['supportedstandards'], list)
+        self.assertGreater(len(manifest['supportedstandards']), 0)
+        self.assertIn('NEP-17', manifest['supportedstandards'])
 
-    def test_gm_symbol(self):
-        engine = self.prepare_testengine()
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'symbol', expected_result_type=str)
-        self.assertEqual('GM', result)
+    async def test_symbol(self):
+        expected = 'GM'
+        result, _ = await self.call('symbol', return_type=str)
+        self.assertEqual(expected, result)
 
-    def test_gm_decimals(self):
-        engine = self.prepare_testengine()
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'decimals')
-        self.assertEqual(8, result)
+    async def test_decimals(self):
+        expected = self.DECIMALS
+        result, _ = await self.call('decimals', return_type=int)
+        self.assertEqual(expected, result)
 
-    def test_gm_total_supply(self):
-        total_supply = 100_000_000 * 10 ** 8
-
-        engine = self.prepare_testengine()
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
+    async def test_before_mint_total_supply(self):
+        total_supply = self.TOTAL_SUPPLY
+        result, _ = await self.call('totalSupply', return_type=int)
         self.assertEqual(total_supply, result)
 
-    def test_gm_allowance(self):
-        approval = 1_000
-        transferred_amount = 500
-        
-        engine = self.prepare_testengine()
+    async def test_balance_of(self):
+        expected = self.OWNER_BALANCE
+        owner_account = self.owner.script_hash
+        result, _ = await self.call('balanceOf', [owner_account], return_type=int)
+        self.assertEqual(expected, result)
 
-        # should have allowance of 0 by default
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
-                                        self.DEPLOYER_ACCOUNT, self.OTHER_ACCOUNT_1,
-                                        expected_result_type=int)
-        self.assertEqual(0, result)
+        bad_account = bytes(10)
+        with self.assertRaises(boatestcase.AssertException):
+            await self.call("balanceOf", [bad_account], return_type=int)
 
-        # should fail when the approve is less than 0
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
-                                    self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, -10,
-                                    signer_accounts=[self.OWNER_SCRIPT_HASH])
+        bad_account = bytes(30)
+        with self.assertRaises(boatestcase.AssertException):
+            await self.call("balanceOf", [bad_account], return_type=int)
 
-        # set an approval for 1000
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'approve',
-                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, approval,
-                                        signer_accounts=[self.OWNER_SCRIPT_HASH])
+    async def test_transfer_success(self):
+        from_account = self.account1
+        to_account = self.account2
+
+        from_script_hash = from_account.script_hash
+        to_script_hash = to_account.script_hash
+        amount = 10
+
+        balance_from, _ = await self.call('balanceOf', [from_script_hash], return_type=int)
+        balance_to, _ = await self.call('balanceOf', [to_script_hash], return_type=int)
+        self.assertGreater(balance_from, amount)
+
+        # transferring tokens to yourself
+        result, notifications = await self.call(
+            'transfer',
+            [from_script_hash, from_script_hash, amount, None],
+            return_type=bool,
+            signing_accounts=[from_account]
+        )
         self.assertEqual(True, result)
-        transfer_events = engine.get_events('Approval')
-        self.assertEqual(1, len(transfer_events))
-        self.assertEqual(3, len(transfer_events[0].arguments))
-
-        owner, spender, amount = transfer_events[0].arguments
-        if isinstance(owner, str):
-            owner = String(owner).to_bytes()
-        if isinstance(spender, str):
-            spender = String(spender).to_bytes()
-        self.assertEqual(self.OWNER_SCRIPT_HASH, owner)
-        self.assertEqual(self.OTHER_ACCOUNT_1, spender)
-        self.assertEqual(approval, amount)
-
-        # should now have allowance of 1000
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
-                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1,
-                                        expected_result_type=int)
-        self.assertEqual(approval, result)
-
-        # transfer from deployer to owner
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.DEPLOYER_ACCOUNT, self.OWNER_SCRIPT_HASH, transferred_amount, None,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        self.assertEqual(True, result)
-
-        # initiate a transfer of 500
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transferFrom',
-                                        self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_2, transferred_amount, None,
-                                        signer_accounts=[self.OTHER_ACCOUNT_1],
-                                        expected_result_type=bool)
-        self.assertEqual(True, result)
-        transfer_events = engine.get_events('Transfer')
-        self.assertEqual(3, len(transfer_events))
-        self.assertEqual(3, len(transfer_events[2].arguments))
-
-        sender, receiver, amount = transfer_events[2].arguments
-        if isinstance(sender, str):
-            sender = String(sender).to_bytes()
-        if isinstance(receiver, str):
-            receiver = String(receiver).to_bytes()
-        self.assertEqual(self.OWNER_SCRIPT_HASH, sender)
-        self.assertEqual(self.OTHER_ACCOUNT_2, receiver)
-        self.assertEqual(transferred_amount, amount)
-
-        # should now have allowance of 500
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'allowance',
-                                        self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1,
-                                        expected_result_type=int)
-        self.assertEqual(amount, result)
-
-    def test_gm_total_balance_of(self):
-        total_supply = 100_000_000 * 10 ** 8
-
-        engine = self.prepare_testengine()
-
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT,
-                                                         signer_accounts=[self.OWNER_SCRIPT_HASH])
-        self.print_notif(engine.notifications)
-        self.assertEqual(total_supply, result)
-
-        # should fail when the script length is not 20
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', bytes(10))
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', bytes(30))
-
-        self.print_notif(engine.notifications)
-
-    def test_gm_total_transfer(self):
-        transferred_amount = 10 * 10 ** 8  # 10 tokens
-
-        engine = self.prepare_testengine()
-
-        # should fail if the sender doesn't sign
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.OWNER_SCRIPT_HASH, self.OTHER_ACCOUNT_1, transferred_amount, None,
-                                         expected_result_type=bool)
-        self.assertEqual(False, result)
-
-        # should fail if the sender doesn't have enough balance
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, transferred_amount, None,
-                                         signer_accounts=[self.OTHER_ACCOUNT_1],
-                                         expected_result_type=bool)
-        self.assertEqual(False, result)
-
-        # should fail when any of the scripts' length is not 20
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                    self.OWNER_SCRIPT_HASH, bytes(10), transferred_amount, "")
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                    bytes(10), self.OTHER_ACCOUNT_1, transferred_amount, "")
-
-        # should fail when the amount is less than 0
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                    self.OTHER_ACCOUNT_1, self.OWNER_SCRIPT_HASH, -10, None)
 
         # fire the transfer event when transferring to yourself
-        balance_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.DEPLOYER_ACCOUNT, self.DEPLOYER_ACCOUNT, transferred_amount, None,
-                                         signer_accounts=[self.DEPLOYER_ACCOUNT],
-                                         expected_result_type=bool)
+        #transfer_events = self.filter_events(notifications, notification_type=boatestcase.Nep17TransferEvent)
+        transfer_events = self.filter_events(notifications, event_name='Transfer', notification_type=boatestcase.Nep17TransferEvent)
+        self.assertEqual(1, len(transfer_events))
+        event = transfer_events[0]
+
+        self.assertEqual(from_script_hash, event.source)
+        self.assertEqual(from_script_hash, event.destination)
+        self.assertEqual(amount, event.amount)
+
+        # # transferring tokens to another account
+        result, notifications = await self.call(
+            'transfer',
+            [from_script_hash, to_script_hash, amount, None],
+            return_type=bool,
+            signing_accounts=[from_account]
+        )
         self.assertEqual(True, result)
-        transfer_events = engine.get_events('Transfer')
-        self.assertEqual(2, len(transfer_events))
-        self.assertEqual(3, len(transfer_events[1].arguments))
 
-        sender, receiver, amount = transfer_events[1].arguments
-        if isinstance(sender, str):
-            sender = String(sender).to_bytes()
-        if isinstance(receiver, str):
-            receiver = String(receiver).to_bytes()
-        self.assertEqual(self.DEPLOYER_ACCOUNT, sender)
-        self.assertEqual(self.DEPLOYER_ACCOUNT, receiver)
-        self.assertEqual(transferred_amount, amount)
+        # fire the transfer event when transferring to yourself
+        transfer_events = self.filter_events(notifications, event_name='Transfer', notification_type=boatestcase.Nep17TransferEvent)
+        self.assertEqual(1, len(transfer_events))
+        event = transfer_events[0]
 
-        # transferring to yourself doesn't change the balance
-        balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
-        self.assertEqual(balance_before, balance_after)
+        self.assertEqual(from_script_hash, event.source)
+        self.assertEqual(to_script_hash, event.destination)
+        self.assertEqual(amount, event.amount)
 
-        # does fire the transfer event
-        balance_sender_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
-        balance_receiver_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OTHER_ACCOUNT_1)
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer',
-                                         self.DEPLOYER_ACCOUNT, self.OTHER_ACCOUNT_1, transferred_amount, None,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        self.assertEqual(True, result)
-        transfer_events = engine.get_events('Transfer')
-        self.assertEqual(3, len(transfer_events))
-        self.assertEqual(3, len(transfer_events[2].arguments))
+        new_balance_from, _ = await self.call('balanceOf', [from_script_hash], return_type=int)
+        new_balance_to, _ = await self.call('balanceOf', [to_script_hash], return_type=int)
 
-        sender, receiver, amount = transfer_events[2].arguments
-        if isinstance(sender, str):
-            sender = String(sender).to_bytes()
-        if isinstance(receiver, str):
-            receiver = String(receiver).to_bytes()
-        self.assertEqual(self.DEPLOYER_ACCOUNT, sender)
-        self.assertEqual(self.OTHER_ACCOUNT_1, receiver)
-        self.assertEqual(transferred_amount, amount)
+        self.assertEqual(balance_from - amount, new_balance_from)
+        self.assertEqual(balance_to + amount, new_balance_to)
 
-        # transferring to someone other than yourself does change the balance
-        balance_sender_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.DEPLOYER_ACCOUNT)
-        balance_receiver_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', self.OTHER_ACCOUNT_1)
-        self.assertEqual(balance_sender_before - transferred_amount, balance_sender_after)
-        self.assertEqual(balance_receiver_before + transferred_amount, balance_receiver_after)
+    async def test_transfer_fail_no_sign(self):
+        from_account = self.owner.script_hash
+        to_account = self.account1.script_hash
+        amount = 10
+
+        balance, _ = await self.call('balanceOf', [from_account], return_type=int)
+        self.assertGreater(balance, amount)
+
+        result, _ = await self.call(
+            'transfer',
+            [from_account, to_account, amount, None],
+            return_type=bool
+        )
+        self.assertEqual(False, result)
+
+    async def test_transfer_fail_insufficient_balance(self):
+        no_balance_account = self.account2
+        other_account = self.account1.script_hash
+        amount = 10
+
+        balance, _ = await self.call('balanceOf', [no_balance_account.script_hash], return_type=int)
+        self.assertEqual(0, balance)
+
+        result, _ = await self.call(
+            'transfer',
+            [no_balance_account.script_hash, other_account, amount, None],
+            return_type=bool,
+            signing_accounts=[no_balance_account]
+        )
+        self.assertEqual(False, result)
+
+    async def test_transfer_fail_bad_account(self):
+        bad_account = bytes(10)
+        other_account = self.owner
+        account_script_hash = other_account.script_hash
+        amount = 10
+
+        # should fail when any of the scripts' length is not 20
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'transfer',
+                [account_script_hash, bad_account, amount, None],
+                return_type=bool,
+                signing_accounts=[other_account]
+            )
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'transfer',
+                [bad_account, account_script_hash, amount, None],
+                return_type=bool,
+                signing_accounts=[other_account]
+            )
+
+    async def test_transfer_fail_invalid_amount(self):
+        from_account = self.owner.script_hash
+        to_account = self.account1.script_hash
+        amount = -1
+
+        # should fail when any of the scripts' length is not 20
+        with self.assertRaises(boatestcase.AssertException):
+            await self.call(
+                'transfer',
+                [from_account, to_account, amount, None],
+                return_type=bool,
+                signing_accounts=[self.owner]
+            )
+
+    async def test_on_nep17_payment_abort(self):
+        # trying to call onNEP17Payment() will result in an abort 
+        with self.assertRaises(boatestcase.AbortException):
+            await self.call(
+                'onNEP17Payment',
+                [self.owner.script_hash, 0, None],
+                return_type=None,
+                signing_accounts=[self.owner]
+            )

@@ -1,702 +1,561 @@
-from typing import Dict
-from pathlib import Path
-from boa3_test.tests.boa_test import BoaTest
-from boa3_test.tests.test_classes.testengine import TestEngine
-from boa3.neo.smart_contract.VoidType import VoidType
-from boa3.neo.cryptography import hash160
-from boa3.constants import GAS_SCRIPT
-from boa3.neo import to_script_hash, to_hex_str
-from boa3.builtin.type import UInt160, ByteString
-from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
-from boa3_test.tests.test_classes.testcontract import TestContract
-
-
-class GhostTest(BoaTest):
-    p = Path(__file__)
-    GHOST_ROOT = str(p.parents[1])
-    PRJ_ROOT = str(p.parents[2])
-
-    CONTRACT_PATH_JSON = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.manifest.json'
-    CONTRACT_PATH_NEF = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.nef'
-    CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/GhostMarket.NFT.py'
-    TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % GHOST_ROOT
-    BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
-    OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
-    OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
-    OTHER_ACCOUNT_2 = bytes(range(20))
-    TOKEN_META = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-    TOKEN_META_2 = bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}", "something_else": 1}', 'utf-8')
-    LOCK_CONTENT = bytes('lockedContent', 'utf-8')
-    ROYALTIES = bytes('[{"address": "someaddress", "value": "200"}, {"address": "someaddress2", "value": "300"}]', 'utf-8')
-    ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
-    CONTRACT = UInt160()
-
-    def build_contract(self, preprocess=False):
-        print('contract path: ' + self.CONTRACT_PATH_PY)
-        if preprocess:
-            import os
-            old = os.getcwd()
-            os.chdir(self.GHOST_ROOT)
-            file = self.GHOST_ROOT + '/compile.py'
-            os.system(file)
-            os.chdir(old)
-        else:
-            output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
-            self.CONTRACT = hash160(output)
-
-    def deploy_contract(self, engine):
-        cc = TestContract(self.CONTRACT_PATH_NEF, self.CONTRACT_PATH_JSON)
-        # engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        engine.add_signer_account(self.OWNER_SCRIPT_HASH)
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', self.OWNER_SCRIPT_HASH, False,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        storage = engine.storage.to_json()
-        #for i in range(0, len(storage)):
-        #    print(storage[i])
-        #self.assertEqual(VoidType, result)
-
-    def prepare_testengine(self, preprocess=False) -> TestEngine:
-        engine = TestEngine(self.TEST_ENGINE_PATH)
-        engine.reset_engine()
-        
-        self.deploy_contract(engine)
-        return engine
-
-    def print_notif(self, notifications):
-        print('\n=========================== NOTIFICATIONS START ===========================\n')
-        for notif in notifications:
-            print(f"{str(notif.name)}: {str(notif.arguments)}")
-        print('\n=========================== NOTIFICATIONS END ===========================\n')
-
-    def test_ghost_symbol(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        result = engine.run(self.CONTRACT_PATH_NEF, 'symbol', reset_engine=True)
-        self.print_notif(engine.notifications)
-
-        assert isinstance(result, str)
-        assert result == 'GHOST'
-
-    def test_ghost_decimals(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        result = engine.run(self.CONTRACT_PATH_NEF, 'decimals', reset_engine=True)
-        self.print_notif(engine.notifications)
-
-        assert isinstance(result, int)
-        assert result == 0
-
-    def test_ghost_total_supply(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        result = engine.run(self.CONTRACT_PATH_NEF, 'totalSupply', reset_engine=True)
-        self.print_notif(engine.notifications)
-
-        assert isinstance(result, int)
-        assert result == 0
-
-    def test_ghost_deploy(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        # prepare_testengine already deploys the contract and verifies it's successfully deployed
-        self.print_notif(engine.notifications)
-
-    def test_ghost_update(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-
-        # updating ghost smart contract
-        file_script = open(self.CONTRACT_PATH_NEF, 'rb')
-        script = file_script.read()
-        #print(script)
-        file_script.close()
-
-        file_manifest = open(self.CONTRACT_PATH_JSON, 'rb')
-        manifest = file_manifest.read()
-        #print(manifest)
-        file_manifest.close()
-
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'update', 
-                                         script, manifest,
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-        self.assertEqual(VoidType, result)
-
-    def test_ghost_destroy(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-
-        # destroy contract
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'destroy',
-                                         signer_accounts=[self.OWNER_SCRIPT_HASH],
-                                         expected_result_type=bool)
-
-        # should not exist anymore
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'symbol')
-        # self.assertNotEqual('GHOST', result)
-
-        self.print_notif(engine.notifications)
-
-    def test_ghost_verify(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-
-        # should return  false, account is not verified
-        print()
-        print("owner: " + str(self.OWNER_SCRIPT_HASH))
-        print("acc1: " + str(self.OTHER_ACCOUNT_1))
-        print("acc2: " + str(self.OTHER_ACCOUNT_2))
-        print()
-        # addresses = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getAuthorizedAddress',
-        #         expected_result_type=list[UInt160],
-        #         signer_accounts=[self.OWNER_SCRIPT_HASH])
-        # print(addresses)
-        # self.assertEqual(addresses[0], self.OWNER_SCRIPT_HASH)
-        # self.assertEqual(len(addresses), 1)
-
-        # verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-        #         signer_accounts=[self.OTHER_ACCOUNT_1],
-        #         expected_result_type=bool)
-        # self.assertEqual(verified, False)
-        # print("one " + str(verified))
-        # verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-        #         signer_accounts=[self.OTHER_ACCOUNT_2],
-        #         expected_result_type=bool)
-        # self.assertEqual(verified, False)
-        # print("two " + str(verified))
-        # verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
-        #         signer_accounts=[self.OWNER_SCRIPT_HASH],
-        #         expected_result_type=bool)
-        # self.assertEqual(verified, True)
-        # print("three " + str(verified))
-
-        self.print_notif(engine.notifications)
-
-    def test_ghost_authorize(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
-                self.OTHER_ACCOUNT_1, True,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=bool)
-        auth_events = engine.get_events('Authorized')
-
-        # check if the event was triggered and the address was authorized
-        self.assertEqual(0, auth_events[0].arguments[1])
-        self.assertEqual(1, auth_events[0].arguments[2])
-
-        # now deauthorize the address
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
-                self.OTHER_ACCOUNT_1, False,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=bool)
-        auth_events = engine.get_events('Authorized')
-        # check if the event was triggered and the address was authorized
-        self.assertEqual(0, auth_events[1].arguments[1])
-        self.assertEqual(0, auth_events[1].arguments[2])
-
-    def test_ghost_pause(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # pause contract
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', True,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-
-        # should fail because contract is paused
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                    signer_accounts=[aux_address],
-                    expected_result_type=bytes)
-
-        # unpause contract
-        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', False,
-                signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
-
-        # mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-        self.print_notif(engine.notifications)
-
-    def test_ghost_mint(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        # output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        # ghost_address = hash160(output)
-        # print(to_hex_str(ghost_address))
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-        print(to_hex_str(GAS_SCRIPT))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # should fail because royalties are bogus
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES_BOGUS,
-                    signer_accounts=[aux_address],
-                    expected_result_type=bytes)
-
-        # should succeed mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[aux_address], expected_result_type=bytes)
-
-        print("token: " + str(token))
-        print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token, expected_result_type=ByteString)
-        print("props: " + str(properties))
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=ByteString)
-        print("royalties: " + str(royalties))
-        royaltiesStandard = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'royaltyInfo', token, GAS_SCRIPT, 1_00000000, expected_result_type=ByteString)
-        print("royaltiesStandard: " + str(royaltiesStandard))
-
-        print('non existing props:')
-        with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
-            properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson',
-                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=ByteString)
-        print("props: " + str(properties))
-
-        # check balances after
-        # ghost_amount_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
-        # gas_aux_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', aux_address)
-        # print("ghost gas amount: " + str(ghost_amount_after))
-        # print("aux gas amount: " + str(gas_aux_after))
-        # ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        # print("balance nft: " + str(ghost_balance_after))
-        # ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        # print("supply nft: " + str(ghost_supply_after))
-        # self.assertEqual(1, ghost_supply_after)
-        self.print_notif(engine.notifications)
-
-    def test_ghost_gas_cost(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # mint token with no meta, no lock content, no royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
-            aux_address, bytes(1), bytes(0), bytes(0),
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with no meta, no lock content, no royalties: " + gasConsumed + " GAS")
-
-        # mint token with meta, no lock content, no royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint',
-            aux_address, self.TOKEN_META, bytes(0), bytes(0),
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with meta, no lock content, no royalties: " + gasConsumed + " GAS")
-
-        # mint token with meta, lock content, no royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, bytes(0),
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with meta, lock content, no royalties: " + gasConsumed + " GAS")
-
-        # mint token with meta, no lock content, royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, bytes(0), self.ROYALTIES,
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with meta, no lock content, royalties: " + gasConsumed + " GAS")
-
-        # mint token with meta, lock content, royalties
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with meta, lock content, royalties: " + gasConsumed + " GAS")
-
-        tokenMeta = bytes('{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-
-        lockedContent = bytes('123456789101234567891012345678910123456789101234567891012345678910123456789101234567891012345678910123456789101234567891012345678910123456789101234567891012345678910123456789101234567891012345678910', 'utf-8')
-
-        royalties = bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30},{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30},{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8')
-
-        # mint high end token
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, tokenMeta, lockedContent, royalties,
-            signer_accounts=[aux_address],
-            expected_result_type=bytes)
-            
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("token with heavy meta, heavy lock content, heavy royalties: " + gasConsumed + " GAS")
-
-        # get locked content
-        content = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContent', token,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-            
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("get locked content: " + gasConsumed + " GAS")
-
-        # burn token
-        burn = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'burn', token,
-            signer_accounts=[aux_address],
-            expected_result_type=bool)
-
-        gasConsumed = str(int(engine.gas_consumed) / 10 ** 8)
-        print("burn: " + gasConsumed + " GAS")
-
-    def test_ghost_multi_mint(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # define custom meta & lock & royalties for multi
-        tokenMeta = [
-                bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
-                bytes('{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
-                bytes('{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-            ]
-
-        lockedContent = [
-                bytes('123', 'utf-8'),
-                bytes('456', 'utf-8'),
-                bytes('789', 'utf-8'),
-            ]
-
-        royalties = [
-                bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8'),
-                bytes('[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]', 'utf-8'),
-                bytes('[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]', 'utf-8'),
-            ]
-
-        # check tokens iterator before
-        ghost_tokens_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens')
-        self.assertEqual([], ghost_tokens_before)
-
-        print("mint now")
-        # multiMint
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
-                aux_address, tokenMeta, lockedContent, royalties,
-                signer_accounts=[aux_address],
-                expected_result_type=list)
-        print("result: " + str(result))
-
-        # check tokens iterator after
-        ghost_tokens_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'tokens', expected_result_type=list)
-        print("tokens after: " + str(ghost_tokens_after))
-        
-        # check balances after
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        self.assertEqual(3, ghost_balance_after)
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        self.assertEqual(3, ghost_supply_after)
-        self.print_notif(engine.notifications)
-        print("tokens after: " + str(ghost_tokens_after))
-
-    def test_ghost_properties(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META_2, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=Dict[str, str])
-        print("props: " + str(properties))
-        print("props: " + properties['name'])
-        self.assertEqual(properties['name'], 'GHOST')
-
-
-    def test_ghost_transfer(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(self.CONTRACT_PATH_NEF.replace('.nef', '.py'))
-        ghost_address = hash160(output)
-        print(to_hex_str(ghost_address))
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'propertiesJson', token)
-        print("props: " + str(properties))
-
-        # check balances after
-        ghost_amount_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', ghost_address)
-        gas_aux_after = self.run_smart_contract(engine, GAS_SCRIPT, 'balanceOf', aux_address)
-        print("ghost gas amount: " + str(ghost_amount_after))
-        print("aux gas amount: " + str(gas_aux_after))
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        print("balance nft: " + str(ghost_balance_after))
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        print("supply nft: " + str(ghost_supply_after))
-        self.assertEqual(1, ghost_supply_after)
+import json
+from typing import Self
+
+from neo3.api import StackItemType
+from neo3.contracts.contract import CONTRACT_HASHES
+from neo3.core import types
+from neo3.wallet import account
+
+from boa3.internal.neo.vm.type.String import String
+from boa3_test.tests import boatestcase, event
+
+
+class TestGHOST(boatestcase.BoaTestCase):
+    DECIMALS = 0
+    OWNER_BALANCE = 0
+    TOTAL_SUPPLY = 0
+
+    owner: account.Account
+    account1: account.Account
+    account2: account.Account
+
+    TOKEN_ID_TRANSFER_TEST: bytes
+    TEST_TOKEN_ID: bytes
+
+    TOKEN_META = bytes(
+        '{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }',
+        'utf-8')
+    TOKEN_LOCKED = bytes('lockedContent', 'utf-8')
+    ROYALTIES = bytes(
+        '[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, '
+        '{"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]',
+        'utf-8')
+
+    ACCOUNT_PREFIX = b'ACC'
+
+    @classmethod
+    def setupTestCase(cls):
+        cls.owner = cls.node.wallet.account_new(label='owner', password='123')
+        cls.account1 = cls.node.wallet.account_new(label='test1', password='123')
+        cls.account2 = cls.node.wallet.account_new(label='test2', password='123')
+
+        super().setupTestCase()
+
+    @classmethod
+    async def asyncSetupClass(cls) -> None:
+        await super().asyncSetupClass()
+
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.owner.script_hash, 100)
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account1.script_hash, 100)
+        await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account2.script_hash, 100)
+
+        await cls.set_up_contract('..', 'contracts/NEP11', 'GhostMarketNFT.py', signing_account=cls.owner)
+
+        mint_args = [cls.TOKEN_META, cls.TOKEN_LOCKED, cls.ROYALTIES]
+        mint_amount = 5
+        account_balance = 2
+        for _ in range(mint_amount):
+            await cls.call(
+                'mint',
+                [cls.owner.script_hash, *mint_args],
+                return_type=bytes,
+                signing_accounts=[cls.owner]
+            )
+
+        account_tokens: list[bytes] = []
+        for _ in range(account_balance):
+            result, _ = await cls.call(
+                'mint',
+                [cls.account1.script_hash, *mint_args],
+                return_type=bytes,
+                signing_accounts=[cls.account1]
+            )
+            account_tokens.append(result)
+
+        cls.TOKEN_ID_TRANSFER_TEST, cls.TEST_TOKEN_ID = account_tokens
+        cls.OWNER_BALANCE = mint_amount
+        cls.TOTAL_SUPPLY = mint_amount + account_balance
+
+    def test_compile(self):
+        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarketNFT.py')
+        _, manifest = self.assertCompile(path, get_manifest=True)
+
+        self.assertIn('supportedstandards', manifest)
+        self.assertIsInstance(manifest['supportedstandards'], list)
+        self.assertGreater(len(manifest['supportedstandards']), 0)
+        self.assertIn('NEP-11', manifest['supportedstandards'])
+
+    async def test_symbol(self):
+        expected = 'GHOST'
+        result, _ = await self.call('symbol', return_type=str)
+        self.assertEqual(expected, result)
+
+    async def test_decimals(self):
+        expected = self.DECIMALS
+        result, _ = await self.call('decimals', return_type=int)
+        self.assertEqual(expected, result)
+
+    async def test_before_mint_total_supply(self):
+        total_supply = self.TOTAL_SUPPLY
+        result, _ = await self.call('totalSupply', return_type=int)
+        self.assertEqual(total_supply, result)
+
+    async def test_balance_of(self):
+        expected = self.OWNER_BALANCE
+        owner_account = self.owner.script_hash
+        result, _ = await self.call('balanceOf', [owner_account], return_type=int)
+        self.assertEqual(expected, result)
+
+        bad_account = bytes(10)
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call("balanceOf", [bad_account], return_type=int)
+        self.assertEqual(str(context.exception), 'balanceOf - not a valid address')
+
+        bad_account = bytes(30)
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call("balanceOf", [bad_account], return_type=int)
+        self.assertEqual(str(context.exception), 'balanceOf - not a valid address')
+
+    async def test_tokens_of(self):
+        no_balance_account = types.UInt160.zero()
+        # TODO: #86drqwhx0 neo-go in the current version of boa-test-constructor is not configured to return Iterators
+        with self.assertRaises(ValueError) as context:
+            result, _ = await self.call('tokensOf', [no_balance_account], return_type=list)
+            self.assertEqual([], result)
+
+        self.assertRegex(str(context.exception), 'Interop stack item only supports iterators')
+
+        tokens_of_storage = await self.get_storage(
+            self.ACCOUNT_PREFIX + no_balance_account.to_array(),
+            remove_prefix=True
+        )
+        self.assertEqual(0, len(tokens_of_storage))
+
+        # TODO: #86drqwhx0 neo-go in the current version of boa-test-constructor is not configured to return Iterators
+        with self.assertRaises(ValueError) as context:
+            result, _ = await self.call('tokensOf', [self.owner.script_hash], return_type=list)
+            self.assertEqual(self.OWNER_BALANCE, len(result))
+
+        self.assertRegex(
+            str(context.exception),
+            fr"item is not of type 'StackItemType.\w+' but of type '{StackItemType.INTEROP_INTERFACE}'"
+        )
+
+        tokens_of_storage = await self.get_storage(
+            self.ACCOUNT_PREFIX + self.owner.script_hash.to_array(),
+            remove_prefix=True
+        )
+        self.assertEqual(self.OWNER_BALANCE, len(tokens_of_storage))
+
+    async def test_transfer_success(self):
+        token = self.TOKEN_ID_TRANSFER_TEST
+        from_account = self.account1.script_hash
+        to_account = self.account2.script_hash
+
+        total_supply, _ = await self.call('totalSupply', [], return_type=int)
 
         # check owner before
-        ghost_owner_of_before = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'ownerOf', token)
-        print("owner of before: " + str(ghost_owner_of_before))
+        result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
+        self.assertEqual(from_account, result)
 
         # transfer
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer', 
-                self.OTHER_ACCOUNT_1, token, None,
-                signer_accounts=[aux_address],
-                expected_result_type=bool)
+        result, notifications = await self.call(
+            'transfer',
+            [to_account, token, None],
+            return_type=bool,
+            signing_accounts=[self.account1]
+        )
         self.assertEqual(True, result)
+        transfer_events = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(len(transfer_events), 1)
+        self.assertEqual(from_account, transfer_events[0].source)
+        self.assertEqual(to_account, transfer_events[0].destination)
+        self.assertEqual(1, transfer_events[0].amount)
+        self.assertEqual(token.decode('utf-8'), transfer_events[0].token_id)
 
         # check owner after
-        ghost_owner_of_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'ownerOf', token)
-        print("owner of after: " + str(ghost_owner_of_after))
-        self.assertEqual(ghost_owner_of_after, self.OTHER_ACCOUNT_1)
+        result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
+        self.assertEqual(self.account2.script_hash, result)
 
         # check balances after
-        ghost_balance_after_transfer = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        ghost_supply_after_transfer = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        print("balance nft after transfer: " + str(ghost_balance_after_transfer))
-        self.assertEqual(0, ghost_balance_after_transfer)
-        self.assertEqual(1, ghost_supply_after_transfer)
+        result, _ = await self.call('balanceOf', [from_account], return_type=int)
+        self.assertEqual(1, result)
+        result, _ = await self.call('totalSupply', [], return_type=int)
+        self.assertEqual(total_supply, result)
 
-        # try to transfer non existing token id
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'transfer', 
-                    self.OTHER_ACCOUNT_1, bytes('thisisanonexistingtoken', 'utf-8'), None,
-                    signer_accounts=[aux_address],
-                    expected_result_type=bool)
+    async def test_transfer_fail_no_sign(self):
+        token = self.TEST_TOKEN_ID
+        from_account = self.account1.script_hash
+        to_account = self.account2.script_hash
 
-        self.print_notif(engine.notifications)
+        # check owner before
+        result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
+        self.assertEqual(from_account, result)
 
-    def test_ghost_burn(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
+        # transfer
+        result, notifications = await self.call(
+            'transfer',
+            [to_account, token, None],
+            return_type=bool
+        )
+        self.assertEqual(False, result)
 
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
+        transfers = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(0, len(transfers))
 
-        # mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[aux_address],
-                expected_result_type=bytes)
+    async def test_transfer_fail_wrong_token_owner(self):
+        token = self.TEST_TOKEN_ID
+        from_account = self.account2.script_hash
+        to_account = self.account1.script_hash
 
-        # burn
-        burn = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'burn', token,
-                signer_accounts=[aux_address],
-                expected_result_type=bool)
-        print("props: " + str(burn))
+        # check if owner is incorrect
+        result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
+        self.assertNotEqual(from_account, result)
+
+        # transfer
+        result, notifications = await self.call(
+            'transfer',
+            [to_account, token, None],
+            return_type=bool,
+            signing_accounts=[self.account2]
+        )
+        self.assertEqual(False, result)
+
+        transfers = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(0, len(transfers))
+
+    async def test_transfer_fail_non_existing_token(self):
+        token = b'thisisanonexistingtoken'
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'transfer',
+                [self.account2.script_hash, token, None],
+                return_type=bool
+            )
+        self.assertEqual(str(context.exception), 'Token not found')
+
+    async def test_transfer_fail_bad_account(self):
+        token = self.TEST_TOKEN_ID
+        to_account = bytes(10)
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'transfer',
+                [to_account, token, None],
+                return_type=bool,
+                signing_accounts=[self.account1]
+            )
+        self.assertEqual(str(context.exception), 'transfer - not a valid address')
+
+    async def test_on_nep11_payment_call(self):
+        # trying to call onNEP11Payment() will result in an abort if the one calling it is not NEO or GAS contracts
+        with self.assertRaises(boatestcase.AbortException):
+            await self.call(
+                'onNEP11Payment',
+                [self.owner.script_hash, 1, self.TEST_TOKEN_ID, None],
+                return_type=None,
+                signing_accounts=[self.owner]
+            )
+
+    async def test_update(self):
+        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarketNFT.py')
+
+        new_nef, new_manifest = self.get_serialized_output(path)
+        arg_manifest = String(json.dumps(new_manifest, separators=(',', ':'))).to_bytes()
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            # missing signature
+            await self.call(
+                'update',
+                [new_nef, arg_manifest],
+                return_type=None
+            )
+        self.assertEqual(str(context.exception), 'update - `account` is not allowed for update')
+
+        result, notifications = await self.call(
+            'update',
+            [new_nef, arg_manifest],
+            return_type=None,
+            signing_accounts=[self.owner]
+        )
+        self.assertIsNone(result)
+
+        update_events = self.filter_events(
+            notifications,
+            event_name='Update',
+            notification_type=event.UpdateEvent
+        )
+        self.assertEqual(1, len(update_events))
+        self.assertEqual(self.contract_hash, update_events[0].updated_contract)
+
+    async def test_destroy(self):
+        owner_test_destroy = self.account2
+
+        contract_hash = await self.compile_and_deploy(
+            '..', 'contracts/NEP11', 'GhostMarketNFT.py',
+            signing_account=owner_test_destroy
+        )
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            # missing signature
+            await self.call(
+                'destroy', [],
+                return_type=None,
+                target_contract=contract_hash
+            )
+        self.assertEqual(str(context.exception), 'destroy - `account` is not allowed for destroy')
+
+        result, notifications = await self.call(
+            'destroy', [],
+            return_type=None,
+            target_contract=contract_hash,
+            signing_accounts=[owner_test_destroy]
+        )
+        self.assertIsNone(result)
+
+        destroy_events = self.filter_events(
+            notifications,
+            event_name='Destroy',
+            notification_type=event.DestroyEvent
+        )
+        self.assertEqual(1, len(destroy_events))
+        self.assertEqual(contract_hash, destroy_events[0].destroyed_contract)
+
+        # should not exist anymore
+        with self.assertRaises(boatestcase.FaultException) as context:
+            await self.call('symbol', [], return_type=str, target_contract=contract_hash)
+        self.assertRegex(str(context.exception), f'called contract {contract_hash} not found')
+
+    async def test_verify(self):
+        result, _ = await self.call('getAuthorizedAddress', [], return_type=list[types.UInt160])
+        self.assertEqual([self.owner.script_hash], result)
+
+        result, _ = await self.call('verify', [], return_type=bool, signing_accounts=[self.owner])
+        self.assertEqual(True, result)
+
+        result, _ = await self.call('verify', [], return_type=bool, signing_accounts=[self.account1])
+        self.assertEqual(False, result)
+
+        result, _ = await self.call('verify', [], return_type=bool, signing_accounts=[self.account2])
+        self.assertEqual(False, result)
+
+    async def test_authorize(self):
+        from dataclasses import dataclass
+        from neo3.api import noderpc
+
+        @dataclass
+        class AuthorizedEvent(boatestcase.BoaTestEvent):
+            authorized: types.UInt160
+            type: int
+            add: bool
+
+            @classmethod
+            def from_untyped_notification(cls, n: noderpc.Notification) -> Self:
+                inner_args_types = tuple(cls.__annotations__.values())
+                e = super().from_notification(n, *inner_args_types)
+                return cls(e.contract, e.name, e.state, *e.state)
+
+        account = self.account1.script_hash
+
+        result, notifications = await self.call(
+            'setAuthorizedAddress',
+            [account, True],
+            return_type=None,
+            signing_accounts=[self.owner]
+        )
+        self.assertIsNone(result)
+
+        authorized = self.filter_events(
+            notifications,
+            event_name='Authorized',
+            notification_type=AuthorizedEvent
+        )
+        self.assertEqual(1, len(authorized))
+        self.assertEqual(account, authorized[0].authorized)
+        self.assertEqual(0, authorized[0].type)
+        self.assertEqual(True, authorized[0].add)
+
+        # now deauthorize the address
+        result, notifications = await self.call(
+            'setAuthorizedAddress',
+            [account, False],
+            return_type=None,
+            signing_accounts=[self.owner]
+        )
+        self.assertIsNone(result)
+
+        authorized = self.filter_events(
+            notifications,
+            event_name='Authorized',
+            notification_type=AuthorizedEvent
+        )
+        self.assertEqual(1, len(authorized))
+        self.assertEqual(account, authorized[0].authorized)
+        self.assertEqual(0, authorized[0].type)
+        self.assertEqual(False, authorized[0].add)
+
+    async def test_pause(self):
+        # missing owner signing transaction
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call('updatePause', [True], return_type=bool)
+        self.assertEqual(str(context.exception), 'updatePause - `account` is not allowed for updatePause')
+
+        test_account = self.account2.script_hash
+        # pause contract
+        result, _ = await self.call('updatePause', [True], return_type=bool, signing_accounts=[self.owner])
+        self.assertEqual(True, result)
+
+        # should fail because contract is paused
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'mint',
+                [test_account, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
+                return_type=str,
+                signing_accounts=[self.account2]
+            )
+        self.assertEqual(str(context.exception), 'mint - contract paused')
+
+        # unpause contract
+        result, _ = await self.call('updatePause', [False], return_type=bool, signing_accounts=[self.owner])
+        self.assertEqual(False, result)
+
+        _, notifications = await self.call(
+            'mint',
+            [test_account, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
+            return_type=str,
+            signing_accounts=[self.account2]
+        )
+
+        mint_events = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(len(mint_events), 1)
+
+    async def test_mint(self):
+        test_account = self.account2
+
+        balance, _ = await self.call('balanceOf', [test_account.script_hash], return_type=int)
+        total_supply, _ = await self.call('totalSupply', [], return_type=int)
+
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call(
+                'mint',
+                [test_account.script_hash, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
+                return_type=str
+            )
+        self.assertEqual(str(context.exception), 'mint - invalid witness')
+
+        token, notifications = await self.call(
+            'mint',
+            [test_account.script_hash, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
+            return_type=str,
+            signing_accounts=[test_account]
+        )
+
+        mint_events = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(len(mint_events), 1)
+        self.assertEqual(None, mint_events[0].source)
+        self.assertEqual(test_account.script_hash, mint_events[0].destination)
+        self.assertEqual(1, mint_events[0].amount)
+        self.assertEqual(token, mint_events[0].token_id)
+
+        result, _ = await self.call('properties', [token], return_type=dict[str, str])
+        token_property = json.loads(self.TOKEN_META.decode('utf-8').replace("'", "\""))
+        self.assertEqual(token_property, result)
+
+        token_royalties = self.ROYALTIES.decode('utf-8')
+        result, _ = await self.call('getRoyalties', [token], return_type=str)
+        self.assertEqual(token_royalties, result)
 
         # check balances after
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        self.assertEqual(0, ghost_balance_after)
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        self.assertEqual(0, ghost_supply_after)
-        self.print_notif(engine.notifications)
+        result, _ = await self.call('balanceOf', [test_account.script_hash], return_type=int)
+        self.assertEqual(balance + 1, result)
 
+        result, _ = await self.call('totalSupply', [], return_type=int)
+        self.assertEqual(total_supply + 1, result)
 
-    def test_ghost_multi_burn(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
+    async def test_properties_success(self):
+        token = self.TEST_TOKEN_ID
+        expected = json.loads(self.TOKEN_META.decode('utf-8').replace("'", "\""))
 
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
+        result, _ = await self.call('properties', [token], return_type=dict[str, str])
+        self.assertEqual(expected, result)
 
-        # define custom meta & lock & royalties for multi
-        tokenMeta = [
-                bytes('{ "name": "GHOST", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
-                bytes('{ "name": "GHOST2", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8'),
-                bytes('{ "name": "GHOST3", "description": "A ghost shows up", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-            ]
+    async def test_properties_fail_non_existent_token(self):
+        token = b'thisisanonexistingtoken'
 
-        lockedContent = [
-                bytes('123', 'utf-8'),
-                bytes('456', 'utf-8'),
-                bytes('789', 'utf-8'),
-            ]
+        with self.assertRaises(boatestcase.AssertException) as context:
+            await self.call('properties', [token], return_type=dict[str, str])
 
-        royalties = [
-                bytes('[{"address": "someaddress", "value": 20}, {"address": "someaddress2", "value": 30}]', 'utf-8'),
-                bytes('[{"address": "someaddress3", "value": 20}, {"address": "someaddress4", "value": 30}]', 'utf-8'),
-                bytes('[{"address": "someaddress5", "value": 20}, {"address": "someaddress6", "value": 30}]', 'utf-8'),
-            ]
+        self.assertEqual(str(context.exception), 'properties - no metadata available for token')
 
-        # multiMint
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiMint', 
-                aux_address, tokenMeta, lockedContent, royalties,
-                signer_accounts=[aux_address],
-                expected_result_type=list)
+    async def test_burn(self):
+        test_account = self.account2
+
+        token, _ = await self.call(
+            'mint',
+            [test_account.script_hash, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
+            return_type=str,
+            signing_accounts=[test_account]
+        )
+
+        balance, _ = await self.call('balanceOf', [test_account.script_hash], return_type=int)
+        total_supply, _ = await self.call('totalSupply', [], return_type=int)
+
+        result, _ = await self.call(
+            'burn',
+            [token],
+            return_type=bool
+        )
+        self.assertEqual(False, result)
+
+        result, notifications = await self.call(
+            'burn',
+            [token],
+            return_type=bool,
+            signing_accounts=[test_account]
+        )
+        self.assertEqual(True, result)
+
+        burn_events = self.filter_events(
+            notifications,
+            origin=[self.contract_hash],
+            event_name='Transfer',
+            notification_type=boatestcase.Nep11TransferEvent
+        )
+        self.assertEqual(len(burn_events), 1)
+        self.assertEqual(test_account.script_hash, burn_events[0].source)
+        self.assertEqual(None, burn_events[0].destination)
+        self.assertEqual(1, burn_events[0].amount)
+        self.assertEqual(token, burn_events[0].token_id)
 
         # check balances after
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        self.assertEqual(3, ghost_balance_after)
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        self.assertEqual(3, ghost_supply_after)
+        result, _ = await self.call('balanceOf', [test_account.script_hash], return_type=int)
+        self.assertEqual(balance - 1, result)
 
-        # multiBurn
-        burn = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'multiBurn', result,
-                signer_accounts=[aux_address],
-                expected_result_type=list)
-        print("burned: " + str(burn))
-
-        # check balances after
-        ghost_balance_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'balanceOf', aux_address)
-        self.assertEqual(0, ghost_balance_after)
-        ghost_supply_after = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'totalSupply')
-        self.assertEqual(0, ghost_supply_after)
-        self.print_notif(engine.notifications)
-
-    def test_ghost_onNEP11Payment(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
-
-        # mint
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-            signer_accounts=[self.OTHER_ACCOUNT_1],
-            expected_result_type=bytes)
-
-        # the smart contract will abort if any address calls the NEP-11 onPayment method
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP11Payment', 
-                self.OTHER_ACCOUNT_1, 1, token, None,
-                signer_accounts=[self.OTHER_ACCOUNT_1],
-                expected_result_type=bool)
-
-    def test_ghost_onNEP17Payment(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        aux_path = self.get_contract_path('test_native', 'auxiliary_contract.py')
-        output, manifest = self.compile_and_save(aux_path)
-        aux_address = hash160(output)
-        print(to_hex_str(aux_address))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(aux_address, add_amount)
-
-        # the smart contract will abort if any address calls the NEP-17 onPayment method
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'onNEP17Payment', aux_address, add_amount, None,
-                                    signer_accounts=[aux_address])
-
-        
-    def test_ghost_locked_content(self):
-        print("test: " + str(self._testMethodName))
-        engine = self.prepare_testengine()
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-
-        # add some gas
-        add_amount = 10 * 10 ** 8
-        engine.add_gas(self.OTHER_ACCOUNT_1, add_amount)
-
-        # mint + getLockedContentViewCount
-        token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
-                signer_accounts=[self.OTHER_ACCOUNT_1],
-                expected_result_type=bytes)
-        views = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContentViewCount', token,
-                expected_result_type=int)
-
-        # should have 0 views
-        self.assertEqual(0, views)
-
-        # getLockedContent
-        content = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContent', token,
-                signer_accounts=[self.OTHER_ACCOUNT_1],
-                expected_result_type=bytes)
-        self.assertEqual(b'lockedContent', content)
-
-        # getLockedContentViewCount should have 1 view
-        views = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContentViewCount', token,
-                expected_result_type=int)
-        print("views: " + str(views))
-        self.assertEqual(1, views)
-
-        # reset views and test getLockedContentViewCount with 100 views
-        views = 0
-        for i in range(0, 100):
-            views += self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getLockedContentViewCount', token,
-                    expected_result_type=int)
-        self.assertEqual(100, views)
-        self.print_notif(engine.notifications)
+        result, _ = await self.call('totalSupply', [], return_type=int)
+        self.assertEqual(total_supply - 1, result)

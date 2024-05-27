@@ -1,12 +1,12 @@
 from typing import Any, List, Union, cast
 
-from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, metadata, public
+from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, public
 from boa3.builtin.type.helper import to_int, to_bool
 from boa3.builtin.contract import Nep17TransferEvent, abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import CallFlags, call_contract, get_call_flags, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
-from boa3.builtin.interop.storage import delete, get, put, get_read_only_context
+from boa3.builtin.interop.storage import delete, get, get_int, get_bool, put, put_int, put_bool, get_read_only_context
 from boa3.builtin.interop.stdlib import serialize, deserialize
 from boa3.builtin.type import UInt160
 
@@ -14,7 +14,6 @@ from boa3.builtin.type import UInt160
 # -------------------------------------------
 # METADATA
 # -------------------------------------------
-@metadata
 def manifest_metadata() -> NeoMetadata:
     """
     Defines this smart contract's metadata information
@@ -146,8 +145,8 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
-    debug(['totalSupply: ', to_int(get(SUPPLY_KEY))])
-    return to_int(get(SUPPLY_KEY, get_read_only_context()))
+    debug(['totalSupply: ', get_int(SUPPLY_KEY)])
+    return get_int(SUPPLY_KEY, get_read_only_context())
 
 
 @public(safe=True)
@@ -161,8 +160,8 @@ def balanceOf(account: UInt160) -> int:
     :type account: UInt160
     """
     expect(validateAddress(account), "balanceOf - invalid address")
-    debug(['balanceOf: ', to_int(get(account, get_read_only_context()))])
-    return to_int(get(account, get_read_only_context()))
+    debug(['balanceOf: ', get_int(account, get_read_only_context())])
+    return get_int(account, get_read_only_context())
 
 @public(safe=True)
 def allowance(from_address: UInt160, spender: UInt160) -> int:
@@ -181,7 +180,7 @@ def allowance(from_address: UInt160, spender: UInt160) -> int:
     """
     expect(validateAddress(from_address), "allowance - invalid from_address address")
     expect(validateAddress(spender), "allowance - invalid spender address")
-    all = to_int(get(mk_allowance_key(from_address, spender), get_read_only_context()))
+    all = get_int(mk_allowance_key(from_address, spender), get_read_only_context())
     debug(['allowance: ', all])
     return all
 
@@ -246,7 +245,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
     expect(amount >= 0, "transferFrom - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
-    from_balance = to_int(get(from_address, get_read_only_context()))
+    from_balance = get_int(from_address, get_read_only_context())
     if from_balance < amount:
         return False
 
@@ -257,7 +256,7 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
         return False
 
     # allowance should be > amount
-    all = to_int(get(mk_allowance_key(from_address, spender), get_read_only_context()))
+    all = get_int(mk_allowance_key(from_address, spender), get_read_only_context())
     expect(amount <= all, "transferFrom - spender allowance exceeded")
 
     # update new allowance
@@ -272,10 +271,10 @@ def transferFrom(spender: UInt160, from_address: UInt160, to_address: UInt160, a
         if from_balance == amount:
             delete(from_address)
         else:
-            put(from_address, from_balance - amount)
+            put_int(from_address, from_balance - amount)
 
-        to_balance = to_int(get(to_address, get_read_only_context()))
-        put(to_address, to_balance + amount)
+        to_balance = get_int(to_address, get_read_only_context())
+        put_int(to_address, to_balance + amount)
 
     # if the method succeeds, it must fire the transfer event
     on_transfer(from_address, to_address, amount)
@@ -313,7 +312,7 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
     expect(amount >= 0, "transfer - amount must be greater than or equal to 0")
 
     # The function MUST return false if the from account balance does not have enough tokens to spend.
-    from_balance = to_int(get(from_address, get_read_only_context()))
+    from_balance = get_int(from_address, get_read_only_context())
     if from_balance < amount:
         return False
 
@@ -328,10 +327,10 @@ def transfer(from_address: UInt160, to_address: UInt160, amount: int, data: Any)
         if from_balance == amount:
             delete(from_address)
         else:
-            put(from_address, from_balance - amount)
+            put_int(from_address, from_balance - amount)
 
-        to_balance = to_int(get(to_address, get_read_only_context()))
-        put(to_address, to_balance + amount)
+        to_balance = get_int(to_address, get_read_only_context())
+        put_int(to_address, to_balance + amount)
 
     # if the method succeeds, it must fire the transfer event
     on_transfer(from_address, to_address, amount)
@@ -359,6 +358,18 @@ def post_transfer(from_address: Union[UInt160, None], to_address: Union[UInt160,
         if contract is not None:
             call_contract(to_address, 'onNEP17Payment', [from_address, amount, data])
 
+@public
+def onNEP17Payment(from_address: UInt160 | None, amount: int, data: Any):
+    """
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
+    :param amount: the amount of cryptocurrency that is being sent to this smart contract
+    :type amount: int
+    :param data: any pertinent data that might validate the transaction
+    :type data: Any
+    """
+    abort()
+
 
 @public
 def _deploy(data: Any, upgrade: bool):
@@ -368,19 +379,19 @@ def _deploy(data: Any, upgrade: bool):
     if upgrade:
         return
 
-    if to_bool(get(DEPLOYED, get_read_only_context())):
+    if get_bool(DEPLOYED, get_read_only_context()):
         abort()
 
-    if to_int(get(SUPPLY_KEY, get_read_only_context())) > 0:
+    if get_int(SUPPLY_KEY, get_read_only_context()) > 0:
         abort()
 
     tx = cast(Transaction, script_container)
     owner: UInt160 = tx.sender
 
-    put(DEPLOYED, True)
-    put(PAUSED, False)
-    put(SUPPLY_KEY, TOKEN_TOTAL_SUPPLY)
-    put(owner, TOKEN_TOTAL_SUPPLY)
+    put_bool(DEPLOYED, True)
+    put_bool(PAUSED, False)
+    put_int(SUPPLY_KEY, TOKEN_TOTAL_SUPPLY)
+    put_int(owner, TOKEN_TOTAL_SUPPLY)
 
     auth: List[UInt160] = []
     auth.append(owner)
@@ -485,8 +496,8 @@ def isPaused() -> bool:
 
     :return: whether the contract is paused
     """
-    debug(['isPaused: ', to_bool(get(PAUSED))])
-    if to_bool(get(PAUSED, get_read_only_context())):
+    debug(['isPaused: ', get_bool(PAUSED)])
+    if get_bool(PAUSED, get_read_only_context()):
         return True
     return False
 
@@ -504,9 +515,9 @@ def updatePause(status: bool) -> bool:
     verified: bool = verify()
     expect(verified, 'updatePause - `account` is not allowed for updatePause')
     expect(isinstance(status, bool), "updatePause - status has to be of type bool")
-    put(PAUSED, status)
-    debug(['updatePause: ', to_bool(get(PAUSED))])
-    return to_bool(get(PAUSED, get_read_only_context())) 
+    put_bool(PAUSED, status)
+    debug(['updatePause: ', get_bool(PAUSED)])
+    return get_bool(PAUSED, get_read_only_context())
 
 
 def verify() -> bool:
@@ -553,7 +564,7 @@ def remove_allowance(owner: UInt160, spender: UInt160):
 def set_allowance(owner: UInt160, spender: UInt160, amount: int):
     key = mk_allowance_key(owner, spender)
     debug(['set_allowance: ', key, owner, spender])
-    put(key, amount)
+    put_int(key, amount)
 
 def mk_allowance_key(owner: UInt160, spender: UInt160) -> bytes:
     return ALLOWANCE_PREFIX + owner + spender
