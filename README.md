@@ -39,9 +39,9 @@ This contract supports both methods for convenience purposes.
 ### Compiling contract
 
 ```
-.compile.py
+./compile.py
 or
-neo3-boa GhostMarketNFT.py
+neo3-boa compile GhostMarketNFT.py
 ```
 
 ### Deploying from neo-cli
@@ -63,13 +63,13 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 Tests can be run with:
 
 ```
-python -m unittest test_ghost
+python3 -m unittest test_ghost
 ```
 
 Individual test can be run with:
 
 ```
-python -m unittest test_ghost.GhostTest.test_ghost_decimals
+python3 -m unittest test_ghost.GhostTest.test_ghost_decimals
 ```
 
 # GhostMarket GM NEP-17 Contract
@@ -90,9 +90,9 @@ Upgradable NEP-17 Contract.
 ### Compiling contract
 
 ```
-.compile2.py
+./compile2.py
 or
-neo3-boa GhostMarketToken.py
+neo3-boa compile GhostMarketToken.py
 ```
 
 ### Deploying from neo-cli
@@ -114,11 +114,11 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 Tests can be run with:
 
 ```
-python -m unittest test_gm
+python3 -m unittest test_gm
 ```
 
 Individual test can be run with:
 
 ```
-python -m unittest test_gm.GhostTest.test_gm_decimals
+python3 -m unittest test_gm.GhostTest.test_gm_decimals
 ```
