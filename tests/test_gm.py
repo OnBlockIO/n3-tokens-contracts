@@ -51,6 +51,7 @@ class TestGM(boatestcase.BoaTestCase):
         self.assertIsInstance(manifest['supportedstandards'], list)
         self.assertGreater(len(manifest['supportedstandards']), 0)
         self.assertIn('NEP-17', manifest['supportedstandards'])
+        self.assertIn('NEP-17-1', manifest['supportedstandards'])
 
     async def test_symbol(self):
         expected = 'GM'

@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Union, cast
 
 from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, public
-from boa3.builtin.type.helper import to_int, to_bool, to_bytes
+from boa3.builtin.type.helper import to_bytes
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import CallFlags, call_contract, destroy_contract, get_call_flags, update_contract
 from boa3.builtin.interop.iterator import Iterator

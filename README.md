@@ -37,6 +37,7 @@ This contract features two methods to handle properties:
 This contract supports both methods for convenience purposes.
 
 ### Compiling contract
+Currently tested and working with neo3-boa 1.2.0
 
 ```
 ./compile.py
@@ -59,6 +60,13 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 ```
 
 ## Testing
+
+Dependencies required to be installed for testing:
+
+```
+pip install "neo3-boa[test]"
+pip3 install typing-extensions
+```
 
 Tests can be run with:
 

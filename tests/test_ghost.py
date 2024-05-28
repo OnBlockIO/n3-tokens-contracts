@@ -84,6 +84,7 @@ class TestGHOST(boatestcase.BoaTestCase):
         self.assertIsInstance(manifest['supportedstandards'], list)
         self.assertGreater(len(manifest['supportedstandards']), 0)
         self.assertIn('NEP-11', manifest['supportedstandards'])
+        self.assertIn('NEP-24', manifest['supportedstandards'])
 
     async def test_symbol(self):
         expected = 'GHOST'
