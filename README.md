@@ -1,7 +1,7 @@
 # GhostMarket NFT NEP-11 Contract
 ## Deployed Contract:
 
-#### GhostMarket.NFT
+#### GhostMarketNFT
 https://dora.coz.io/contract/neo3/mainnet/0x577a51f7d39162c9de1db12a6b319c848e4c54e5
 
 ## Audit
@@ -41,7 +41,7 @@ This contract supports both methods for convenience purposes.
 ```
 .compile.py
 or
-neo3-boa GhostMarket.NFT.py
+neo3-boa GhostMarketNFT.py
 ```
 
 ### Deploying from neo-cli

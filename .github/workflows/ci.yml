@@ -40,7 +40,7 @@ jobs:
     - name: Compile ghost contract
       run: |
         cd contracts/NEP11
-        neo3-boa GhostMarket.NFT.py
+        neo3-boa GhostMarketNFT.py
 
     - name: Test ghost contract
       run: |
