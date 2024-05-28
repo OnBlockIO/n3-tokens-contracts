@@ -21,26 +21,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v2
-      with:
-        dotnet-version: 6.0.x
-
-    - name: Check out neo devpack
-      uses: actions/checkout@v3
-      with:
-        repository: simplitech/neo-devpack-dotnet
-        path: neo-devpack-dotnet
-        ref: v3.4.0
-
-    - name: Build neo devpack
-      run: dotnet build ./neo-devpack-dotnet/src/Neo.TestEngine/Neo.TestEngine.csproj
+        pip install "neo3-boa[test]"
+        pip install typing-extensions
 
     - name: Compile ghost contract
       run: |
         cd contracts/NEP11
-        neo3-boa GhostMarketNFT.py
+        neo3-boa compile GhostMarketNFT.py
 
     - name: Test ghost contract
       run: |
@@ -50,7 +37,7 @@ jobs:
     - name: Compile gm contract
       run: |
         cd contracts/NEP17
-        neo3-boa GhostMarketToken.py
+        neo3-boa compile GhostMarketToken.py
 
     - name: Test gm contract
       run: |
