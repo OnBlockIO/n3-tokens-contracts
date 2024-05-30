@@ -32,7 +32,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.description = "GhostMarket NEP11 contract"
     meta.email = "hello@ghostmarket.io"
     meta.supported_standards = ["NEP-11", "NEP-24"]
-    meta.source = "https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP11/GhostMarketNFT.py"
+    meta.source = "https://github.com/OnBlockIO/n3-tokens-contracts/blob/master/contracts/NEP11/GhostMarket.NFT.py"
     meta.add_permission(contract='*', methods='*')
     return meta
 
