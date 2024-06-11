@@ -50,7 +50,7 @@ class TestGHOST(boatestcase.BoaTestCase):
         await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account1.script_hash, 100)
         await cls.transfer(CONTRACT_HASHES.GAS_TOKEN, cls.genesis.script_hash, cls.account2.script_hash, 100)
 
-        await cls.set_up_contract('..', 'contracts/NEP11', 'GhostMarketNFT.py', signing_account=cls.owner)
+        await cls.set_up_contract('..', 'contracts/NEP11', 'GhostMarket.NFT.py', signing_account=cls.owner)
 
         mint_args = [cls.TOKEN_META, cls.TOKEN_LOCKED, cls.ROYALTIES]
         mint_amount = 5
@@ -78,7 +78,7 @@ class TestGHOST(boatestcase.BoaTestCase):
         cls.TOTAL_SUPPLY = mint_amount + account_balance
 
     def test_compile(self):
-        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarketNFT.py')
+        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarket.NFT.py')
         _, manifest = self.assertCompile(path, get_manifest=True)
 
         self.assertIn('supportedstandards', manifest)
@@ -283,7 +283,7 @@ class TestGHOST(boatestcase.BoaTestCase):
             )
 
     async def test_update(self):
-        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarketNFT.py')
+        path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarket.NFT.py')
 
         new_nef, new_manifest = self.get_serialized_output(path)
         arg_manifest = String(json.dumps(new_manifest, separators=(',', ':'))).to_bytes()
@@ -317,7 +317,7 @@ class TestGHOST(boatestcase.BoaTestCase):
         owner_test_destroy = self.account2
 
         contract_hash = await self.compile_and_deploy(
-            '..', 'contracts/NEP11', 'GhostMarketNFT.py',
+            '..', 'contracts/NEP11', 'GhostMarket.NFT.py',
             signing_account=owner_test_destroy
         )
 
