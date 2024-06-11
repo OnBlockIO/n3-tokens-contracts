@@ -8,6 +8,7 @@ from neo3.wallet import account
 
 from boa3.internal.neo.vm.type.String import String
 from boa3_test.tests import boatestcase, event
+from neo3.network.payloads import verification
 
 
 class TestGHOST(boatestcase.BoaTestCase):
@@ -223,12 +224,19 @@ class TestGHOST(boatestcase.BoaTestCase):
         result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
         self.assertNotEqual(from_account, result)
 
+        signer = verification.Signer(
+            from_account,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+
         # transfer
         result, notifications = await self.call(
             'transfer',
             [to_account, token, None],
             return_type=bool,
-            signing_accounts=[self.account2]
+            signing_accounts=[self.account2],
+            signers=[signer]
         )
         self.assertEqual(False, result)
 
@@ -374,11 +382,18 @@ class TestGHOST(boatestcase.BoaTestCase):
 
         account = self.account1.script_hash
 
+        signer = verification.Signer(
+            self.owner.script_hash,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+
         result, notifications = await self.call(
             'setAuthorizedAddress',
             [account, True],
             return_type=None,
-            signing_accounts=[self.owner]
+            signing_accounts=[self.owner],
+            signers=[signer]
         )
         self.assertIsNone(result)
 
@@ -397,7 +412,8 @@ class TestGHOST(boatestcase.BoaTestCase):
             'setAuthorizedAddress',
             [account, False],
             return_type=None,
-            signing_accounts=[self.owner]
+            signing_accounts=[self.owner],
+            signers=[signer]
         )
         self.assertIsNone(result)
 
@@ -419,7 +435,13 @@ class TestGHOST(boatestcase.BoaTestCase):
 
         test_account = self.account2.script_hash
         # pause contract
-        result, _ = await self.call('updatePause', [True], return_type=bool, signing_accounts=[self.owner])
+        signer = verification.Signer(
+            self.owner.script_hash,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+        
+        result, _ = await self.call('updatePause', [True], return_type=bool, signing_accounts=[self.owner], signers=[signer])
         self.assertEqual(True, result)
 
         # should fail because contract is paused
@@ -433,7 +455,7 @@ class TestGHOST(boatestcase.BoaTestCase):
         self.assertEqual(str(context.exception), 'mint - contract paused')
 
         # unpause contract
-        result, _ = await self.call('updatePause', [False], return_type=bool, signing_accounts=[self.owner])
+        result, _ = await self.call('updatePause', [False], return_type=bool, signing_accounts=[self.owner], signers=[signer])
         self.assertEqual(False, result)
 
         _, notifications = await self.call(
@@ -465,11 +487,18 @@ class TestGHOST(boatestcase.BoaTestCase):
             )
         self.assertEqual(str(context.exception), 'mint - invalid witness')
 
+        signer = verification.Signer(
+            test_account.script_hash,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+
         token, notifications = await self.call(
             'mint',
             [test_account.script_hash, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
             return_type=str,
-            signing_accounts=[test_account]
+            signing_accounts=[test_account],
+            signers=[signer]
         )
 
         mint_events = self.filter_events(
@@ -517,11 +546,18 @@ class TestGHOST(boatestcase.BoaTestCase):
     async def test_burn(self):
         test_account = self.account2
 
+        signer = verification.Signer(
+            test_account.script_hash,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+
         token, _ = await self.call(
             'mint',
             [test_account.script_hash, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES],
             return_type=str,
-            signing_accounts=[test_account]
+            signing_accounts=[test_account],
+            signers=[signer]
         )
 
         balance, _ = await self.call('balanceOf', [test_account.script_hash], return_type=int)
@@ -538,7 +574,8 @@ class TestGHOST(boatestcase.BoaTestCase):
             'burn',
             [token],
             return_type=bool,
-            signing_accounts=[test_account]
+            signing_accounts=[test_account],
+            signers=[signer]
         )
         self.assertEqual(True, result)
 

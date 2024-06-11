@@ -2,7 +2,7 @@ from neo3.contracts.contract import CONTRACT_HASHES
 from neo3.wallet import account
 
 from boa3_test.tests import boatestcase
-
+from neo3.network.payloads import verification
 
 class TestGM(boatestcase.BoaTestCase):
     # default_folder: str = '../contracts/NEP17'
@@ -114,11 +114,18 @@ class TestGM(boatestcase.BoaTestCase):
         self.assertEqual(amount, event.amount)
 
         # # transferring tokens to another account
+        signer = verification.Signer(
+            from_account.script_hash,
+            verification.WitnessScope.CUSTOM_CONTRACTS,
+            allowed_contracts=[self.contract_hash]
+        )
+
         result, notifications = await self.call(
             'transfer',
             [from_script_hash, to_script_hash, amount, None],
             return_type=bool,
-            signing_accounts=[from_account]
+            signing_accounts=[from_account],
+            signers=[signer]
         )
         self.assertEqual(True, result)
 
