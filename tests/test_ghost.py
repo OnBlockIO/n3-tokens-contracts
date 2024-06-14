@@ -9,6 +9,7 @@ from neo3.wallet import account
 from boa3.internal.neo.vm.type.String import String
 from boa3_test.tests import boatestcase, event
 from neo3.network.payloads import verification
+from neo3.network.payloads.verification import WitnessRuleAction, ConditionCalledByEntry
 
 
 class TestGHOST(boatestcase.BoaTestCase):
@@ -223,10 +224,10 @@ class TestGHOST(boatestcase.BoaTestCase):
         # check if owner is incorrect
         result, _ = await self.call('ownerOf', [token], return_type=types.UInt160)
         self.assertNotEqual(from_account, result)
-
+        
         signer = verification.Signer(
             from_account,
-            verification.WitnessScope.CUSTOM_CONTRACTS,
+            verification.WitnessScope.WITNESS_RULES,
             allowed_contracts=[self.contract_hash]
         )
 
@@ -487,10 +488,15 @@ class TestGHOST(boatestcase.BoaTestCase):
             )
         self.assertEqual(str(context.exception), 'mint - invalid witness')
 
+        # witness rules CalledByEntry
+        rule = verification.WitnessRule(
+            action=WitnessRuleAction.ALLOW,
+            condition=ConditionCalledByEntry()
+        )
         signer = verification.Signer(
             test_account.script_hash,
-            verification.WitnessScope.CUSTOM_CONTRACTS,
-            allowed_contracts=[self.contract_hash]
+            verification.WitnessScope.WITNESS_RULES,
+            rules=[rule]
         )
 
         token, notifications = await self.call(
