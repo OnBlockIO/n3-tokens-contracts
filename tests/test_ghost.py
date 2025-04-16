@@ -1,25 +1,18 @@
 import json
-import unittest
-from typing import Optional, TypeVar, Type, Sequence, Self
+from typing import Self
 
 from neo3.api import StackItemType
 from neo3.contracts.contract import CONTRACT_HASHES
 from neo3.core import types
 from neo3.wallet import account
-from neo3.api.wrappers import GenericContract, NEP17Contract, ChainFacade
-from neo3.api import noderpc
 
 from boa3.internal.neo.vm.type.String import String
 from boa3_test.tests import boatestcase, event
 from neo3.network.payloads import verification
 from neo3.network.payloads.verification import WitnessRuleAction, ConditionCalledByEntry
-from neo3.network.payloads.verification import Signer
 
-T = TypeVar("T")
 
-class TestGHOST(unittest.IsolatedAsyncioTestCase):
-    contract_hash: types.UInt160
-
+class TestGHOST(boatestcase.BoaTestCase):
     DECIMALS = 0
     OWNER_BALANCE = 0
     TOTAL_SUPPLY = 0
@@ -84,104 +77,6 @@ class TestGHOST(unittest.IsolatedAsyncioTestCase):
         cls.TOKEN_ID_TRANSFER_TEST, cls.TEST_TOKEN_ID = account_tokens
         cls.OWNER_BALANCE = mint_amount
         cls.TOTAL_SUPPLY = mint_amount + account_balance
-
-    @classmethod
-    async def call(
-        cls,
-        method: str,
-        args: Optional[list] = None,
-        *,
-        return_type: Type[T],
-        signing_accounts: Optional[Sequence[account.Account]] = None,
-        signers: Optional[Sequence[Signer]] = None,
-        target_contract: Optional[types.UInt160] = None,
-    ) -> tuple[T, list[noderpc.Notification]]:
-        """
-        Calls the contract specified by `contract_hash`
-
-        Args:
-            method: name of the method to call
-            args: method arguments
-            return_type: expected return type. Will be used to unwrap and cast the results.
-            signing_accounts:
-                If not specified a 'test_invoke' will be performed.
-                If specified an 'invoke' (=state persisting) will be performed. The default witness scope is CALLED_BY_ENTRY.
-                This can be overridden using the `signers` argument.
-            signers: a list of custom signers. Must have the same length as `signing_account` if that is specified.
-            target_contract: call a different contract than the one under test. e.g. NeoToken
-        """
-        if target_contract is None:
-            contract = GenericContract(cls.contract_hash)
-        else:
-            contract = GenericContract(target_contract)
-
-        facade = cls.node.facade
-
-        if signing_accounts is not None:
-            signing_pairs = []
-
-            if signers is not None and len(signers) != len(signing_accounts):
-                raise ValueError(f"signing_accounts and signers length must be equal")
-
-            for i, signing_account in enumerate(signing_accounts):
-                if signers is None:
-                    signer = Signer(signing_account.script_hash)
-                else:
-                    # take it from the supplied list
-                    signer = signers[i]
-                if signing_account.is_multisig:
-                    signing_pairs.append(
-                        (
-                            sign_insecure_with_multisig_account(
-                                signing_account, password="123"
-                            ),
-                            signer,
-                        )
-                    )
-                else:
-                    signing_pairs.append(
-                        (
-                            sign_insecure_with_account(signing_account, password="123"),
-                            signer,
-                        )
-                    )
-            receipt = await facade.invoke(
-                contract.call_function(method, args), signers=signing_pairs
-            )
-            cls._check_vmstate(receipt)
-            exec_result = receipt.result
-            notifications = receipt.notifications
-        else:
-            receipt_ = await facade.test_invoke(
-                contract.call_function(method, args), signers=signers
-            )
-            cls._check_vmstate(receipt_)
-            exec_result = receipt_
-            notifications = receipt_.notifications
-
-        # Can't seem to get mypy to understand the return type of the first element in the tuple
-        if return_type is str:
-            return unwrap.as_str(exec_result), notifications  # type: ignore
-        elif return_type is int:
-            return unwrap.as_int(exec_result), notifications  # type: ignore
-        elif return_type is bool:
-            return unwrap.as_bool(exec_result), notifications  # type: ignore
-        elif return_type is dict:
-            return unwrap.as_dict(exec_result), notifications  # type: ignore
-        elif return_type is list:
-            return unwrap.as_list(exec_result), notifications  # type: ignore
-        elif return_type is types.UInt160:
-            return unwrap.as_uint160(exec_result), notifications  # type: ignore
-        elif return_type is types.UInt256:
-            return unwrap.as_uint256(exec_result), notifications  # type: ignore
-        elif return_type is bytes:
-            return unwrap.as_bytes(exec_result), notifications  # type: ignore
-        elif return_type is cryptography.ECPoint:
-            return unwrap.as_public_key(exec_result), notifications  # type: ignore
-        elif return_type is None:
-            return unwrap.as_none(exec_result), notifications  # type: ignore
-        else:
-            raise ValueError(f"unsupported return_type: {return_type}")
 
     def test_compile(self):
         path = self.get_contract_path('..', 'contracts/NEP11', 'GhostMarket.NFT.py')
