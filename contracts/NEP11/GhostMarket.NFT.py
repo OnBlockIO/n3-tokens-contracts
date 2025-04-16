@@ -1,5 +1,4 @@
 # legacy file kept for external linking.
-# boa test does not support . in names, once fixed the two .py files will be merged
 
 from typing import Any, Dict, List, Union, cast
 
